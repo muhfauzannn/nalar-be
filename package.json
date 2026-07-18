@@ -1,0 +1,27 @@
+{
+  "name": "bernalar-be",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "auth:generate": "auth generate --config src/modules/auth/auth.ts --output src/database/schema/auth.ts --yes",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.6.23",
+    "better-auth": "1.6.23",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.30",
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "auth": "1.6.23",
+    "drizzle-kit": "0.31.10",
+    "typescript": "^5.9.3"
+  }
+}

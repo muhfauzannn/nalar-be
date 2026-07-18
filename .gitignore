@@ -1,0 +1,13 @@
+# deps
+node_modules/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# generated/runtime
+dist/
+*.log
+
+/AGENTS.md
