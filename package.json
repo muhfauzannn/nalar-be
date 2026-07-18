@@ -9,6 +9,7 @@
     "auth:generate": "auth generate --config src/modules/auth/auth.ts --output src/database/schema/auth.ts --yes",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "bun run src/database/seed.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
