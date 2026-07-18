@@ -271,6 +271,7 @@ export async function listCourseContent(courseId: string, enrollmentId: string) 
           status: quiz.status,
           timeLimitMinutes: quiz.timeLimitMinutes,
           attemptStatus: quizAttempt.status,
+          attemptStartedAt: quizAttempt.startedAt,
           score: quizAttempt.score,
         })
         .from(quiz)
@@ -682,6 +683,7 @@ export async function findStudentQuiz(quizId: string, schoolMembershipId: string
       timeLimitMinutes: quiz.timeLimitMinutes,
       courseId: course.id,
       courseName: course.name,
+      courseStatus: course.status,
       enrollmentId: courseMembership.id,
       enrollmentStatus: courseMembership.status,
     })
@@ -762,7 +764,7 @@ export async function createQuizAttempt(quizId: string, enrollmentId: string) {
     .onConflictDoNothing()
     .returning();
 
-  if (created) return created;
+  if (created) return { attempt: created, created: true } as const;
 
   const [existing] = await db
     .select()
@@ -775,7 +777,7 @@ export async function createQuizAttempt(quizId: string, enrollmentId: string) {
       ),
     )
     .limit(1);
-  return existing;
+  return existing ? ({ attempt: existing, created: false } as const) : null;
 }
 
 export async function saveQuizAnswers(
@@ -863,20 +865,24 @@ export async function findQuizAttemptAccess(
       id: quizAttempt.id,
       status: quizAttempt.status,
       quizId: quizAttempt.quizId,
+      quizStatus: quiz.status,
+      courseStatus: course.status,
       enrollmentId: quizAttempt.studentCourseMembershipId,
+      enrollmentStatus: courseMembership.status,
       closesAt: quiz.closesAt,
       timeLimitMinutes: quiz.timeLimitMinutes,
       startedAt: quizAttempt.startedAt,
     })
     .from(quizAttempt)
     .innerJoin(quiz, eq(quiz.id, quizAttempt.quizId))
+    .innerJoin(course, eq(course.id, quiz.courseId))
     .innerJoin(
       courseMembership,
       and(
         eq(courseMembership.id, quizAttempt.studentCourseMembershipId),
         eq(courseMembership.schoolMembershipId, schoolMembershipId),
         eq(courseMembership.role, "student"),
-        eq(courseMembership.status, "active"),
+        inArray(courseMembership.status, ["active", "completed"]),
       ),
     )
     .where(eq(quizAttempt.id, attemptId))

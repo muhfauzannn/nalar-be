@@ -22,7 +22,7 @@ export const auth = betterAuth({
       prompt: "select_account",
     },
   },
-  trustedOrigins: [env.frontendUrl],
+  trustedOrigins: env.trustedOrigins,
   advanced: {
     database: {
       generateId: "uuid",

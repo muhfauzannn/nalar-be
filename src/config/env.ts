@@ -20,6 +20,41 @@ function url(source: NodeJS.ProcessEnv, name: string): URL {
   }
 }
 
+function origins(source: NodeJS.ProcessEnv, name: string): string[] {
+  const values = required(source, name)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const parsedOrigins = values.map((value) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new Error(
+        `Environment variable ${name} must contain valid comma-separated URLs`,
+      );
+    }
+
+    if (
+      parsed.origin === "null" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error(
+        `Environment variable ${name} must contain exact origins without paths, credentials, query strings, or fragments`,
+      );
+    }
+
+    return parsed.origin;
+  });
+
+  return [...new Set(parsedOrigins)];
+}
+
 function port(source: NodeJS.ProcessEnv): number {
   const value = source.PORT;
 
@@ -45,12 +80,22 @@ function loadEnv(source: NodeJS.ProcessEnv = process.env) {
 
   url(source, "BETTER_AUTH_URL");
 
+  const frontendUrl = url(source, "FRONTEND_URL").origin;
+  const trustedOrigins = origins(source, "TRUSTED_ORIGIN");
+
+  if (!trustedOrigins.includes(frontendUrl)) {
+    throw new Error(
+      "Environment variable TRUSTED_ORIGIN must include the FRONTEND_URL origin",
+    );
+  }
+
   return {
     databaseUrl: required(source, "DATABASE_URL"),
-    frontendUrl: url(source, "FRONTEND_URL").origin,
+    frontendUrl,
     googleClientId: required(source, "GOOGLE_CLIENT_ID"),
     googleClientSecret: required(source, "GOOGLE_CLIENT_SECRET"),
     port: port(source),
+    trustedOrigins,
   } as const;
 }
 

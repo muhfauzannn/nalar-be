@@ -11,10 +11,11 @@ const app = new Hono();
 app.use(
   "/api/*",
   cors({
-    origin: env.frontendUrl,
+    origin: [...env.trustedOrigins],
     allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
+    maxAge: 600,
   }),
 );
 
@@ -22,7 +23,13 @@ app.route("/api/auth", authRoutes);
 app.route("/api/student", studentRoutes);
 
 app.onError((error, context) => {
-  if (error instanceof StudentServiceError || error instanceof RequestValidationError) {
+  if (error instanceof StudentServiceError) {
+    return context.json(
+      { error: error.message, ...(error.code ? { code: error.code } : {}) },
+      error.status,
+    );
+  }
+  if (error instanceof RequestValidationError) {
     return context.json({ error: error.message }, error.status);
   }
   return context.json({ error: "Terjadi kesalahan pada server." }, 500);

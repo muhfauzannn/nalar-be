@@ -25,10 +25,27 @@ import {
 
 export type QuizAnswerInput = QuizAnswerValue;
 
+export type StudentErrorCode =
+  | "QUIZ_NOT_FOUND"
+  | "QUIZ_ENROLLMENT_INACTIVE"
+  | "QUIZ_NOT_AVAILABLE"
+  | "QUIZ_ALREADY_STARTED"
+  | "QUIZ_EMPTY"
+  | "QUIZ_NOT_READY"
+  | "QUIZ_ATTEMPT_NOT_FOUND"
+  | "QUIZ_ATTEMPT_SUBMITTED"
+  | "QUIZ_ATTEMPT_EXPIRED"
+  | "QUIZ_QUESTION_INVALID"
+  | "QUIZ_ANSWER_INVALID"
+  | "QUIZ_ANSWERS_INCOMPLETE"
+  | "QUIZ_START_CONFLICT"
+  | "QUIZ_SUBMIT_CONFLICT";
+
 export class StudentServiceError extends Error {
   constructor(
     public readonly status: 400 | 403 | 404 | 409,
     message: string,
+    public readonly code?: StudentErrorCode,
   ) {
     super(message);
     this.name = "StudentServiceError";
@@ -55,8 +72,47 @@ function isOpenForWork(item: {
   return (
     item.status === "published" &&
     (!item.availableAt || item.availableAt.getTime() <= now) &&
-    (!item.closesAt || item.closesAt.getTime() >= now)
+    (!item.closesAt || now < item.closesAt.getTime())
   );
+}
+
+function getQuizAvailability(item: {
+  status: string;
+  availableAt: Date | null;
+  closesAt: Date | null;
+}) {
+  const now = Date.now();
+  if (item.status !== "published") return "closed" as const;
+  if (item.availableAt && now < item.availableAt.getTime()) return "upcoming" as const;
+  if (item.closesAt && now >= item.closesAt.getTime()) return "closed" as const;
+  return "available" as const;
+}
+
+function getQuizActivityStatus(item: {
+  status: string;
+  availableAt?: Date | null;
+  closesAt: Date | null;
+  timeLimitMinutes: number | null;
+  attemptStatus: "in_progress" | "submitted" | null;
+  attemptStartedAt: Date | null;
+}) {
+  if (item.attemptStatus === "submitted") return "submitted" as const;
+  if (item.attemptStatus === "in_progress" && item.attemptStartedAt) {
+    return getAttemptTiming({
+      closesAt: item.closesAt,
+      timeLimitMinutes: item.timeLimitMinutes,
+      startedAt: item.attemptStartedAt,
+    }).isExpired || item.status !== "published"
+      ? ("expired" as const)
+      : ("in_progress" as const);
+  }
+  return getQuizAvailability({
+    status: item.status,
+    availableAt: item.availableAt ?? null,
+    closesAt: item.closesAt,
+  }) === "available"
+    ? ("not_started" as const)
+    : ("closed" as const);
 }
 
 export async function getStudentShell(session: AuthSession) {
@@ -117,7 +173,7 @@ export async function getStudentDashboard(session: AuthSession) {
   const upcoming = content
     .flatMap((item, index) => {
       const courseRow = rows[index];
-      if (!courseRow) return [];
+      if (!courseRow || courseRow.status !== "published") return [];
       return [
       ...item.assignmentRows
         .filter((entry) => !entry.submissionStatus || entry.submissionStatus === "in_progress")
@@ -130,14 +186,21 @@ export async function getStudentDashboard(session: AuthSession) {
           status: entry.submissionStatus ?? "not_started",
         })),
       ...item.quizRows
-        .filter((entry) => entry.attemptStatus !== "submitted")
         .map((entry) => ({
+          entry,
+          effectiveStatus: getQuizActivityStatus(entry),
+        }))
+        .filter(
+          ({ effectiveStatus }) =>
+            effectiveStatus === "not_started" || effectiveStatus === "in_progress",
+        )
+        .map(({ entry, effectiveStatus }) => ({
           id: entry.id,
           type: "quiz" as const,
           title: entry.title,
           courseName: courseRow.name,
           dueAt: entry.dueAt,
-          status: entry.attemptStatus ?? "not_started",
+          status: effectiveStatus,
         })),
     ];
     })
@@ -223,7 +286,13 @@ export async function getStudentCourse(userId: string, courseId: string) {
     progress,
     modules: Array.from(moduleMap.values()),
     assignments: content.assignmentRows,
-    quizzes: content.quizRows,
+    quizzes: content.quizRows.map((quizRow) => ({
+      ...quizRow,
+      attemptStatus:
+        courseRow.status === "published"
+          ? getQuizActivityStatus(quizRow)
+          : "archived",
+    })),
     announcements: content.announcements,
   };
 }
@@ -311,7 +380,9 @@ export async function completeStudentStage(input: {
 export async function getStudentQuiz(userId: string, quizId: string) {
   const context = await requireStudentContext(userId);
   const row = await findStudentQuiz(quizId, context.membershipId);
-  if (!row) throw new StudentServiceError(404, "Quiz tidak ditemukan.");
+  if (!row) {
+    throw new StudentServiceError(404, "Quiz tidak ditemukan.", "QUIZ_NOT_FOUND");
+  }
   const questionMap = new Map<
     string,
     {
@@ -326,6 +397,18 @@ export async function getStudentQuiz(userId: string, quizId: string) {
     }
   >();
   const submitted = row.attempt?.status === "submitted";
+  const attemptTiming =
+    row.attempt?.status === "in_progress"
+      ? getAttemptTiming({
+          closesAt: row.closesAt,
+          timeLimitMinutes: row.timeLimitMinutes,
+          startedAt: row.attempt.startedAt,
+        })
+      : null;
+  const baseAvailability =
+    row.enrollmentStatus === "active" && row.courseStatus === "published"
+      ? getQuizAvailability(row)
+      : "read_only";
   for (const questionRow of row.questionRows) {
     if (!questionMap.has(questionRow.questionId)) {
       questionMap.set(questionRow.questionId, {
@@ -355,6 +438,21 @@ export async function getStudentQuiz(userId: string, quizId: string) {
     }
   }
 
+  const quizReady = quizDefinitionsAreReady(
+    row.questionRows.map((questionRow) => ({
+      questionId: questionRow.questionId,
+      questionType: questionRow.questionType,
+      acceptedAnswers: questionRow.acceptedAnswers,
+      points: questionRow.points,
+      optionId: questionRow.optionId,
+      isCorrect: questionRow.optionIsCorrect,
+    })),
+  );
+  const availability =
+    baseAvailability === "available" && !quizReady
+      ? "not_ready"
+      : baseAvailability;
+
   return {
     quiz: {
       id: row.id,
@@ -369,39 +467,137 @@ export async function getStudentQuiz(userId: string, quizId: string) {
       courseName: row.courseName,
     },
     questions: Array.from(questionMap.values()),
-    attempt: row.attempt,
-    canStart: row.enrollmentStatus === "active" && isOpenForWork(row) && !row.attempt,
+    attempt: row.attempt
+      ? {
+          ...row.attempt,
+          expiresAt: attemptTiming?.expiresAt?.toISOString() ?? null,
+          isExpired: attemptTiming?.isExpired ?? false,
+          remainingSeconds: attemptTiming?.remainingSeconds ?? null,
+          canContinue:
+            row.enrollmentStatus === "active" &&
+            row.courseStatus === "published" &&
+            row.status === "published" &&
+            quizReady &&
+            !(attemptTiming?.isExpired ?? false),
+        }
+      : null,
+    availability,
+    canStart:
+      row.enrollmentStatus === "active" &&
+      row.courseStatus === "published" &&
+      isOpenForWork(row) &&
+      quizReady &&
+      !row.attempt,
   };
 }
 
 export async function startStudentQuiz(userId: string, quizId: string) {
   const context = await requireStudentContext(userId);
   const row = await findStudentQuiz(quizId, context.membershipId);
-  if (!row) throw new StudentServiceError(404, "Quiz tidak ditemukan.");
+  if (!row) {
+    throw new StudentServiceError(404, "Quiz tidak ditemukan.", "QUIZ_NOT_FOUND");
+  }
   if (row.enrollmentStatus !== "active") {
-    throw new StudentServiceError(409, "Enrollment course tidak lagi aktif.");
+    throw new StudentServiceError(
+      409,
+      "Enrollment course tidak lagi aktif.",
+      "QUIZ_ENROLLMENT_INACTIVE",
+    );
+  }
+  if (row.courseStatus !== "published") {
+    throw new StudentServiceError(
+      409,
+      "Course tidak lagi menerima aktivitas baru.",
+      "QUIZ_NOT_AVAILABLE",
+    );
+  }
+  if (row.attempt) {
+    if (row.attempt.status === "submitted") {
+      throw new StudentServiceError(
+        409,
+        "Quiz ini sudah dikumpulkan.",
+        "QUIZ_ATTEMPT_SUBMITTED",
+      );
+    }
+    const timing = getAttemptTiming({
+      closesAt: row.closesAt,
+      timeLimitMinutes: row.timeLimitMinutes,
+      startedAt: row.attempt.startedAt,
+    });
+    if (timing.isExpired) {
+      throw new StudentServiceError(
+        409,
+        "Waktu pengerjaan quiz telah berakhir.",
+        "QUIZ_ATTEMPT_EXPIRED",
+      );
+    }
+    throw new StudentServiceError(
+      409,
+      "Quiz sudah dimulai. Lanjutkan attempt yang sedang berjalan.",
+      "QUIZ_ALREADY_STARTED",
+    );
   }
   if (!isOpenForWork(row)) {
-    throw new StudentServiceError(409, "Quiz belum tersedia atau sudah ditutup.");
+    throw new StudentServiceError(
+      409,
+      "Quiz belum tersedia atau sudah ditutup.",
+      "QUIZ_NOT_AVAILABLE",
+    );
   }
   const definitions = await listQuizQuestionDefinitions(quizId);
   const questions = groupQuizQuestionDefinitions(definitions);
   if (questions.size === 0) {
-    throw new StudentServiceError(409, "Quiz belum memiliki soal.");
+    throw new StudentServiceError(409, "Quiz belum memiliki soal.", "QUIZ_EMPTY");
   }
-  for (const rows of questions.values()) {
-    const question = rows[0];
-    if (!question) continue;
-    const isReady =
-      question.questionType === "multiple_choice"
-        ? rows.filter((row) => row.optionId).length >= 2 &&
-          rows.filter((row) => row.isCorrect).length === 1
-        : (question.acceptedAnswers?.length ?? 0) > 0;
-    if (!isReady) {
-      throw new StudentServiceError(409, "Quiz memiliki soal yang belum siap dipublikasikan.");
-    }
+  if (!quizDefinitionsAreReady(definitions)) {
+    throw new StudentServiceError(
+      409,
+      "Quiz memiliki soal yang belum siap dipublikasikan.",
+      "QUIZ_NOT_READY",
+    );
   }
-  return createQuizAttempt(quizId, row.enrollmentId);
+  const result = await createQuizAttempt(quizId, row.enrollmentId);
+  if (!result) {
+    throw new StudentServiceError(
+      409,
+      "Quiz gagal dimulai. Muat ulang halaman lalu coba lagi.",
+      "QUIZ_START_CONFLICT",
+    );
+  }
+  if (!result.created) {
+    throw new StudentServiceError(
+      409,
+      result.attempt.status === "submitted"
+        ? "Quiz ini sudah dikumpulkan."
+        : "Quiz sudah dimulai. Lanjutkan attempt yang sedang berjalan.",
+      result.attempt.status === "submitted"
+        ? "QUIZ_ATTEMPT_SUBMITTED"
+        : "QUIZ_ALREADY_STARTED",
+    );
+  }
+  return result.attempt;
+}
+
+function getAttemptTiming(attempt: {
+  closesAt: Date | null;
+  timeLimitMinutes: number | null;
+  startedAt: Date;
+}) {
+  const now = Date.now();
+  const deadlines: number[] = [];
+  if (attempt.closesAt) deadlines.push(attempt.closesAt.getTime());
+  if (attempt.timeLimitMinutes) {
+    deadlines.push(
+      attempt.startedAt.getTime() + attempt.timeLimitMinutes * 60_000,
+    );
+  }
+  const expiresAtMs = deadlines.length > 0 ? Math.min(...deadlines) : null;
+  return {
+    expiresAt: expiresAtMs === null ? null : new Date(expiresAtMs),
+    isExpired: expiresAtMs !== null && now >= expiresAtMs,
+    remainingSeconds:
+      expiresAtMs === null ? null : Math.max(0, Math.ceil((expiresAtMs - now) / 1_000)),
+  };
 }
 
 function ensureAttemptTimeRemaining(attempt: {
@@ -409,15 +605,12 @@ function ensureAttemptTimeRemaining(attempt: {
   timeLimitMinutes: number | null;
   startedAt: Date;
 }) {
-  const now = Date.now();
-  if (attempt.closesAt && attempt.closesAt.getTime() < now) {
-    throw new StudentServiceError(409, "Batas waktu quiz telah berakhir.");
-  }
-  if (
-    attempt.timeLimitMinutes &&
-    attempt.startedAt.getTime() + attempt.timeLimitMinutes * 60_000 < now
-  ) {
-    throw new StudentServiceError(409, "Durasi pengerjaan quiz telah berakhir.");
+  if (getAttemptTiming(attempt).isExpired) {
+    throw new StudentServiceError(
+      409,
+      "Waktu pengerjaan quiz telah berakhir.",
+      "QUIZ_ATTEMPT_EXPIRED",
+    );
   }
 }
 
@@ -435,6 +628,20 @@ function groupQuizQuestionDefinitions(rows: QuizQuestionDefinition[]) {
   return questions;
 }
 
+function quizDefinitionsAreReady(rows: QuizQuestionDefinition[]) {
+  const questions = groupQuizQuestionDefinitions(rows);
+  if (questions.size === 0) return false;
+
+  return Array.from(questions.values()).every((questionRows) => {
+    const question = questionRows[0];
+    if (!question) return false;
+    return question.questionType === "multiple_choice"
+      ? questionRows.filter((row) => row.optionId).length >= 2 &&
+          questionRows.filter((row) => row.isCorrect).length === 1
+      : (question.acceptedAnswers?.length ?? 0) > 0;
+  });
+}
+
 function validateAnswers(
   definitionRows: QuizQuestionDefinition[],
   answers: QuizAnswerInput[],
@@ -444,12 +651,16 @@ function validateAnswers(
   const validated: QuizAnswerInput[] = [];
   for (const answer of answers) {
     if (seen.has(answer.questionId)) {
-      throw new StudentServiceError(400, "Satu soal hanya boleh memiliki satu jawaban.");
+      throw new StudentServiceError(
+        400,
+        "Satu soal hanya boleh memiliki satu jawaban.",
+        "QUIZ_ANSWER_INVALID",
+      );
     }
     const rows = questions.get(answer.questionId);
     const question = rows?.[0];
     if (!rows || !question) {
-      throw new StudentServiceError(400, "Soal quiz tidak valid.");
+      throw new StudentServiceError(400, "Soal quiz tidak valid.", "QUIZ_QUESTION_INVALID");
     }
 
     if (question.questionType === "multiple_choice") {
@@ -458,7 +669,11 @@ function validateAnswers(
         answer.textAnswer !== undefined ||
         !rows.some((row) => row.optionId === answer.selectedOptionId)
       ) {
-        throw new StudentServiceError(400, "Pilihan jawaban tidak valid.");
+        throw new StudentServiceError(
+          400,
+          "Pilihan jawaban tidak valid.",
+          "QUIZ_ANSWER_INVALID",
+        );
       }
       validated.push({
         questionId: answer.questionId,
@@ -471,7 +686,11 @@ function validateAnswers(
         !textAnswer ||
         textAnswer.length > 500
       ) {
-        throw new StudentServiceError(400, "Jawaban isian tidak valid.");
+        throw new StudentServiceError(
+          400,
+          "Jawaban isian tidak valid.",
+          "QUIZ_ANSWER_INVALID",
+        );
       }
       validated.push({ questionId: answer.questionId, textAnswer });
     }
@@ -497,7 +716,7 @@ function gradeAnswers(
     const rows = questions.get(answer.questionId);
     const question = rows?.[0];
     if (!rows || !question) {
-      throw new StudentServiceError(400, "Soal quiz tidak valid.");
+      throw new StudentServiceError(400, "Soal quiz tidak valid.", "QUIZ_QUESTION_INVALID");
     }
     const isCorrect =
       question.questionType === "multiple_choice"
@@ -526,15 +745,52 @@ export async function saveStudentQuizAnswers(input: {
 }) {
   const context = await requireStudentContext(input.userId);
   const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
-  if (!attempt) throw new StudentServiceError(404, "Attempt quiz tidak ditemukan.");
+  if (!attempt) {
+    throw new StudentServiceError(
+      404,
+      "Attempt quiz tidak ditemukan.",
+      "QUIZ_ATTEMPT_NOT_FOUND",
+    );
+  }
+  if (attempt.enrollmentStatus !== "active") {
+    throw new StudentServiceError(
+      409,
+      "Enrollment course tidak lagi aktif.",
+      "QUIZ_ENROLLMENT_INACTIVE",
+    );
+  }
+  if (attempt.courseStatus !== "published" || attempt.quizStatus !== "published") {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak lagi menerima jawaban.",
+      "QUIZ_NOT_AVAILABLE",
+    );
+  }
   if (attempt.status !== "in_progress") {
-    throw new StudentServiceError(409, "Quiz ini sudah dikumpulkan.");
+    throw new StudentServiceError(
+      409,
+      "Quiz ini sudah dikumpulkan.",
+      "QUIZ_ATTEMPT_SUBMITTED",
+    );
   }
   ensureAttemptTimeRemaining(attempt);
   const definitions = await listQuizQuestionDefinitions(attempt.quizId);
+  if (!quizDefinitionsAreReady(definitions)) {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak dapat dinilai karena konfigurasi soal tidak lagi valid.",
+      "QUIZ_NOT_READY",
+    );
+  }
   const answers = validateAnswers(definitions, input.answers);
   const saved = await saveQuizAnswers(input.attemptId, answers);
-  if (!saved) throw new StudentServiceError(409, "Quiz ini sudah dikumpulkan.");
+  if (!saved) {
+    throw new StudentServiceError(
+      409,
+      "Quiz ini sudah dikumpulkan.",
+      "QUIZ_ATTEMPT_SUBMITTED",
+    );
+  }
   return { saved: true, savedAt: new Date().toISOString() };
 }
 
@@ -545,19 +801,56 @@ export async function deleteStudentQuizAnswer(input: {
 }) {
   const context = await requireStudentContext(input.userId);
   const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
-  if (!attempt) throw new StudentServiceError(404, "Attempt quiz tidak ditemukan.");
+  if (!attempt) {
+    throw new StudentServiceError(
+      404,
+      "Attempt quiz tidak ditemukan.",
+      "QUIZ_ATTEMPT_NOT_FOUND",
+    );
+  }
+  if (attempt.enrollmentStatus !== "active") {
+    throw new StudentServiceError(
+      409,
+      "Enrollment course tidak lagi aktif.",
+      "QUIZ_ENROLLMENT_INACTIVE",
+    );
+  }
+  if (attempt.courseStatus !== "published" || attempt.quizStatus !== "published") {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak lagi menerima jawaban.",
+      "QUIZ_NOT_AVAILABLE",
+    );
+  }
   if (attempt.status !== "in_progress") {
-    throw new StudentServiceError(409, "Quiz ini sudah dikumpulkan.");
+    throw new StudentServiceError(
+      409,
+      "Quiz ini sudah dikumpulkan.",
+      "QUIZ_ATTEMPT_SUBMITTED",
+    );
   }
   ensureAttemptTimeRemaining(attempt);
 
   const definitions = await listQuizQuestionDefinitions(attempt.quizId);
+  if (!quizDefinitionsAreReady(definitions)) {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak dapat diubah karena konfigurasi soal tidak lagi valid.",
+      "QUIZ_NOT_READY",
+    );
+  }
   if (!definitions.some((definition) => definition.questionId === input.questionId)) {
-    throw new StudentServiceError(400, "Soal quiz tidak valid.");
+    throw new StudentServiceError(400, "Soal quiz tidak valid.", "QUIZ_QUESTION_INVALID");
   }
 
   const deleted = await deleteQuizAnswer(input.attemptId, input.questionId);
-  if (!deleted) throw new StudentServiceError(409, "Quiz ini sudah dikumpulkan.");
+  if (!deleted) {
+    throw new StudentServiceError(
+      409,
+      "Quiz ini sudah dikumpulkan.",
+      "QUIZ_ATTEMPT_SUBMITTED",
+    );
+  }
   return { deleted: true, savedAt: new Date().toISOString() };
 }
 
@@ -568,17 +861,52 @@ export async function submitStudentQuiz(input: {
 }) {
   const context = await requireStudentContext(input.userId);
   const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
-  if (!attempt) throw new StudentServiceError(404, "Attempt quiz tidak ditemukan.");
+  if (!attempt) {
+    throw new StudentServiceError(
+      404,
+      "Attempt quiz tidak ditemukan.",
+      "QUIZ_ATTEMPT_NOT_FOUND",
+    );
+  }
+  if (attempt.enrollmentStatus !== "active") {
+    throw new StudentServiceError(
+      409,
+      "Enrollment course tidak lagi aktif.",
+      "QUIZ_ENROLLMENT_INACTIVE",
+    );
+  }
+  if (attempt.courseStatus !== "published" || attempt.quizStatus !== "published") {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak lagi menerima jawaban.",
+      "QUIZ_NOT_AVAILABLE",
+    );
+  }
   if (attempt.status !== "in_progress") {
-    throw new StudentServiceError(409, "Quiz ini sudah dikumpulkan.");
+    throw new StudentServiceError(
+      409,
+      "Quiz ini sudah dikumpulkan.",
+      "QUIZ_ATTEMPT_SUBMITTED",
+    );
   }
   ensureAttemptTimeRemaining(attempt);
 
   const definitions = await listQuizQuestionDefinitions(attempt.quizId);
+  if (!quizDefinitionsAreReady(definitions)) {
+    throw new StudentServiceError(
+      409,
+      "Quiz tidak dapat dinilai karena konfigurasi soal tidak lagi valid.",
+      "QUIZ_NOT_READY",
+    );
+  }
   const answers = validateAnswers(definitions, input.answers);
   const questions = groupQuizQuestionDefinitions(definitions);
   if (answers.length !== questions.size) {
-    throw new StudentServiceError(400, "Semua soal harus dijawab sebelum dikumpulkan.");
+    throw new StudentServiceError(
+      400,
+      "Semua soal harus dijawab sebelum dikumpulkan.",
+      "QUIZ_ANSWERS_INCOMPLETE",
+    );
   }
   const gradedAnswers = gradeAnswers(definitions, answers);
   const totalPoints = Array.from(questions.values()).reduce(
@@ -598,6 +926,12 @@ export async function submitStudentQuiz(input: {
     gradedAnswers,
     score.toFixed(2),
   );
-  if (!result) throw new StudentServiceError(409, "Quiz gagal dikumpulkan.");
+  if (!result) {
+    throw new StudentServiceError(
+      409,
+      "Quiz gagal dikumpulkan karena status attempt telah berubah.",
+      "QUIZ_SUBMIT_CONFLICT",
+    );
+  }
   return result;
 }
