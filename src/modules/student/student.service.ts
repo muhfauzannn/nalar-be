@@ -26,6 +26,16 @@ import {
 export type QuizAnswerInput = QuizAnswerValue;
 
 export type StudentErrorCode =
+  | "ASSIGNMENT_NOT_FOUND"
+  | "ASSIGNMENT_ENROLLMENT_INACTIVE"
+  | "ASSIGNMENT_NOT_AVAILABLE"
+  | "ASSIGNMENT_SUBMISSION_NOT_FOUND"
+  | "ASSIGNMENT_SUBMISSION_SUBMITTED"
+  | "ASSIGNMENT_SUBMISSION_EXPIRED"
+  | "ASSIGNMENT_STAGE_INVALID"
+  | "ASSIGNMENT_STAGE_OUT_OF_ORDER"
+  | "ASSIGNMENT_CONTENT_INVALID"
+  | "ASSIGNMENT_SUBMIT_CONFLICT"
   | "QUIZ_NOT_FOUND"
   | "QUIZ_ENROLLMENT_INACTIVE"
   | "QUIZ_NOT_AVAILABLE"
@@ -82,6 +92,20 @@ function getQuizAvailability(item: {
   closesAt: Date | null;
 }) {
   const now = Date.now();
+  if (item.status !== "published") return "closed" as const;
+  if (item.availableAt && now < item.availableAt.getTime()) return "upcoming" as const;
+  if (item.closesAt && now >= item.closesAt.getTime()) return "closed" as const;
+  return "available" as const;
+}
+
+function getAssignmentAvailability(item: {
+  status: string;
+  availableAt: Date | null;
+  closesAt: Date | null;
+  enrollmentStatus: string;
+}) {
+  const now = Date.now();
+  if (item.enrollmentStatus !== "active") return "read_only" as const;
   if (item.status !== "published") return "closed" as const;
   if (item.availableAt && now < item.availableAt.getTime()) return "upcoming" as const;
   if (item.closesAt && now >= item.closesAt.getTime()) return "closed" as const;
@@ -319,17 +343,38 @@ export async function setStudentLessonProgress(
 export async function getStudentAssignment(userId: string, assignmentId: string) {
   const context = await requireStudentContext(userId);
   const row = await findStudentAssignment(assignmentId, context.membershipId);
-  if (!row) throw new StudentServiceError(404, "Assignment tidak ditemukan.");
-  return row;
+  if (!row) {
+    throw new StudentServiceError(
+      404,
+      "Assignment tidak ditemukan.",
+      "ASSIGNMENT_NOT_FOUND",
+    );
+  }
+  const availability = getAssignmentAvailability(row);
+  return {
+    ...row,
+    availability,
+    canStart: !row.submission && availability === "available",
+    canContinue:
+      row.submission?.status === "in_progress" && availability === "available",
+  };
 }
 
 export async function startStudentAssignment(userId: string, assignmentId: string) {
   const row = await getStudentAssignment(userId, assignmentId);
   if (row.enrollmentStatus !== "active") {
-    throw new StudentServiceError(409, "Enrollment course tidak lagi aktif.");
+    throw new StudentServiceError(
+      409,
+      "Enrollment course tidak lagi aktif.",
+      "ASSIGNMENT_ENROLLMENT_INACTIVE",
+    );
   }
   if (!isOpenForWork(row)) {
-    throw new StudentServiceError(409, "Assignment belum tersedia atau sudah ditutup.");
+    throw new StudentServiceError(
+      409,
+      "Assignment belum tersedia atau sudah ditutup.",
+      "ASSIGNMENT_NOT_AVAILABLE",
+    );
   }
   if (row.submission?.status === "submitted" || row.submission?.status === "returned") {
     return row.submission;
@@ -345,35 +390,93 @@ export async function completeStudentStage(input: {
 }) {
   const context = await requireStudentContext(input.userId);
   const access = await findSubmissionAccess(input.submissionId, context.membershipId);
-  if (!access) throw new StudentServiceError(404, "Submission tidak ditemukan.");
+  if (!access) {
+    throw new StudentServiceError(
+      404,
+      "Submission tidak ditemukan.",
+      "ASSIGNMENT_SUBMISSION_NOT_FOUND",
+    );
+  }
   if (access.status !== "in_progress") {
-    throw new StudentServiceError(409, "Submission ini sudah selesai.");
+    if (access.status === "submitted" && input.stage === "5_reflection") {
+      return { currentStage: null, submitted: true, alreadyCompleted: true };
+    }
+    throw new StudentServiceError(
+      409,
+      "Submission ini sudah selesai.",
+      "ASSIGNMENT_SUBMISSION_SUBMITTED",
+    );
   }
   if (access.assignmentStatus !== "published") {
-    throw new StudentServiceError(409, "Assignment sudah ditutup.");
+    throw new StudentServiceError(
+      409,
+      "Assignment sudah ditutup.",
+      "ASSIGNMENT_NOT_AVAILABLE",
+    );
   }
-  if (access.closesAt && access.closesAt.getTime() < Date.now()) {
-    throw new StudentServiceError(409, "Batas waktu pengerjaan assignment telah berakhir.");
+  if (access.closesAt && access.closesAt.getTime() <= Date.now()) {
+    throw new StudentServiceError(
+      409,
+      "Batas waktu pengerjaan assignment telah berakhir.",
+      "ASSIGNMENT_SUBMISSION_EXPIRED",
+    );
   }
   if (access.currentStage !== input.stage) {
-    throw new StudentServiceError(409, "Tahap harus diselesaikan secara berurutan.");
+    throw new StudentServiceError(
+      409,
+      "Tahap harus diselesaikan secara berurutan.",
+      "ASSIGNMENT_STAGE_OUT_OF_ORDER",
+    );
   }
 
   const stageIndex = workflowStages.indexOf(input.stage);
-  if (stageIndex < 0) throw new StudentServiceError(400, "Tahap tidak valid.");
+  if (stageIndex < 0) {
+    throw new StudentServiceError(
+      400,
+      "Tahap tidak valid.",
+      "ASSIGNMENT_STAGE_INVALID",
+    );
+  }
   const requiresArtifact = input.stage !== "2_guided_questioning";
   const content = input.content?.trim();
   if (requiresArtifact && (!content || content.length < 10)) {
-    throw new StudentServiceError(400, "Jawaban tahap minimal 10 karakter.");
+    throw new StudentServiceError(
+      400,
+      "Jawaban tahap minimal 10 karakter.",
+      "ASSIGNMENT_CONTENT_INVALID",
+    );
   }
 
   const nextStage = workflowStages[stageIndex + 1] ?? null;
-  await persistStageCompletion({
+  const completion = await persistStageCompletion({
     submissionId: input.submissionId,
     stage: input.stage,
     nextStage,
     content: requiresArtifact ? content : undefined,
   });
+  if (!completion.applied) {
+    const currentIndex = completion.currentStage
+      ? workflowStages.indexOf(completion.currentStage)
+      : -1;
+    if (
+      completion.status === "submitted" &&
+      input.stage === "5_reflection"
+    ) {
+      return { currentStage: null, submitted: true, alreadyCompleted: true };
+    }
+    if (currentIndex > stageIndex) {
+      return {
+        currentStage: completion.currentStage,
+        submitted: false,
+        alreadyCompleted: true,
+      };
+    }
+    throw new StudentServiceError(
+      409,
+      "Tahap berubah saat jawaban diproses. Muat ulang assignment lalu coba lagi.",
+      "ASSIGNMENT_SUBMIT_CONFLICT",
+    );
+  }
   return { currentStage: nextStage, submitted: nextStage === null };
 }
 

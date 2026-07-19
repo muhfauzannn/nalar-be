@@ -503,6 +503,14 @@ export async function findStudentAssignment(
       .from(stageArtifact)
       .where(
         and(eq(stageArtifact.submissionId, submissionRow.id), eq(stageArtifact.isFinal, true)),
+      )
+      .orderBy(
+        sql`case ${stageArtifact.stage}
+          when '1_independent_effort' then 1
+          when '2_guided_questioning' then 2
+          when '3_ai_evaluation' then 3
+          when '4_revision_finalization' then 4
+          when '5_reflection' then 5 end`,
       ),
     db
       .select({ score: submissionAssessment.score, feedback: submissionAssessment.feedback })
@@ -572,6 +580,27 @@ export async function persistStageCompletion(input: {
   return db.transaction(async (transaction) => {
     const now = new Date();
 
+    const [lockedSubmission] = await transaction
+      .select({
+        status: submission.status,
+        currentStage: submission.currentStage,
+      })
+      .from(submission)
+      .where(eq(submission.id, input.submissionId))
+      .for("update");
+
+    if (
+      !lockedSubmission ||
+      lockedSubmission.status !== "in_progress" ||
+      lockedSubmission.currentStage !== input.stage
+    ) {
+      return {
+        applied: false as const,
+        status: lockedSubmission?.status ?? null,
+        currentStage: lockedSubmission?.currentStage ?? null,
+      };
+    }
+
     if (input.content !== undefined) {
       const [latest] = await transaction
         .select({ version: stageArtifact.version })
@@ -605,7 +634,7 @@ export async function persistStageCompletion(input: {
       });
     }
 
-    await transaction
+    const [completedStage] = await transaction
       .update(stageProgress)
       .set({ status: "completed", completedAt: now, updatedAt: now })
       .where(
@@ -614,7 +643,12 @@ export async function persistStageCompletion(input: {
           eq(stageProgress.stage, input.stage),
           eq(stageProgress.status, "in_progress"),
         ),
-      );
+      )
+      .returning({ id: stageProgress.id });
+
+    if (!completedStage) {
+      throw new Error("Progres tahap assignment tidak konsisten.");
+    }
 
     if (input.nextStage) {
       await transaction
@@ -638,6 +672,12 @@ export async function persistStageCompletion(input: {
         .set({ status: "submitted", submittedAt: now, updatedAt: now })
         .where(eq(submission.id, input.submissionId));
     }
+
+    return {
+      applied: true as const,
+      status: input.nextStage ? ("in_progress" as const) : ("submitted" as const),
+      currentStage: input.nextStage,
+    };
   });
 }
 
