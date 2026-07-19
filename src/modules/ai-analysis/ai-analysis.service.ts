@@ -19,7 +19,10 @@ import {
 } from "./ai-analysis.repository";
 
 const SCORING_VERSION = "nalar-offload-v1";
-const GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash";
+// `generateContent` model for offline analysis (offloading index + quiz reflection).
+// Must be a servable model id — `gemini-3.1-flash` (only `-lite` shipped) 404s and
+// silently yields null reports. `gemini-2.5-flash` is GA and supports structured output.
+const GEMINI_ANALYSIS_MODEL = "gemini-2.5-flash";
 const MAX_ARTIFACT_CHARS = 4_000;
 const MAX_TUTOR_TURNS = 40;
 const OFFLOADING_LEVELS: OffloadingLevel[] = [
@@ -291,6 +294,11 @@ async function callGemini(
       systemInstruction,
       temperature: 0.4,
       maxOutputTokens: 1_200,
+      // Disable thinking: on Flash thinking models the reasoning tokens eat the
+      // output budget and truncate the JSON body, so JSON.parse fails and the
+      // report silently comes back null. This is structured extraction, not a
+      // task that needs a reasoning trace.
+      thinkingConfig: { thinkingBudget: 0 },
       responseMimeType: "application/json",
       responseSchema,
     },
