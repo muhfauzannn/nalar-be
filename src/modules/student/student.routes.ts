@@ -12,6 +12,8 @@ import {
   getStudentQuiz,
   getStudentShell,
   listStudentCourses,
+  regenerateQuizReflection,
+  regenerateSubmissionOffloading,
   saveStudentQuizAnswers,
   setStudentLessonProgress,
   startStudentAssignment,
@@ -110,6 +112,17 @@ studentRoutes.post(
   },
 );
 
+studentRoutes.post(
+  "/submissions/:submissionId/offloading",
+  async (context) =>
+    context.json(
+      await regenerateSubmissionOffloading(
+        context.get("session").user.id,
+        requiredId(context.req.param("submissionId")),
+      ),
+    ),
+);
+
 studentRoutes.get("/quizzes/:quizId", async (context) =>
   context.json(
     await getStudentQuiz(
@@ -177,6 +190,15 @@ studentRoutes.post("/quiz-attempts/:attemptId/submit", async (context) => {
     }),
   );
 });
+
+studentRoutes.post("/quiz-attempts/:attemptId/reflection", async (context) =>
+  context.json(
+    await regenerateQuizReflection(
+      context.get("session").user.id,
+      requiredId(context.req.param("attemptId")),
+    ),
+  ),
+);
 
 export class RequestValidationError extends Error {
   readonly status = 400;

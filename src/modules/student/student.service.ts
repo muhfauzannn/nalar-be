@@ -1,5 +1,11 @@
 import type { AuthSession } from "../auth/auth";
 import {
+  generateQuizReflection,
+  generateSubmissionOffloading,
+  getQuizReflection,
+  getSubmissionOffloading,
+} from "../ai-analysis/ai-analysis.service";
+import {
   createQuizAttempt,
   deleteQuizAnswer,
   createStudentSubmission,
@@ -351,13 +357,44 @@ export async function getStudentAssignment(userId: string, assignmentId: string)
     );
   }
   const availability = getAssignmentAvailability(row);
+  const finished =
+    row.submission?.status === "submitted" ||
+    row.submission?.status === "returned";
+  const offloading =
+    finished && row.submission
+      ? await getSubmissionOffloading(row.submission.id)
+      : null;
   return {
     ...row,
+    submission: row.submission ? { ...row.submission, offloading } : null,
     availability,
     canStart: !row.submission && availability === "available",
     canContinue:
       row.submission?.status === "in_progress" && availability === "available",
   };
+}
+
+export async function regenerateSubmissionOffloading(
+  userId: string,
+  submissionId: string,
+) {
+  const context = await requireStudentContext(userId);
+  const access = await findSubmissionAccess(submissionId, context.membershipId);
+  if (!access) {
+    throw new StudentServiceError(
+      404,
+      "Submission tidak ditemukan.",
+      "ASSIGNMENT_SUBMISSION_NOT_FOUND",
+    );
+  }
+  if (access.status !== "submitted" && access.status !== "returned") {
+    throw new StudentServiceError(
+      409,
+      "Laporan refleksi hanya tersedia setelah assignment dikumpulkan.",
+    );
+  }
+  const offloading = await generateSubmissionOffloading(submissionId);
+  return { generated: Boolean(offloading), offloading };
 }
 
 export async function startStudentAssignment(userId: string, assignmentId: string) {
@@ -477,6 +514,11 @@ export async function completeStudentStage(input: {
       "ASSIGNMENT_SUBMIT_CONFLICT",
     );
   }
+  // Final stage submitted: produce the reflective AI Offloading report. This is
+  // best-effort and never throws, so a failed analysis cannot block submission.
+  if (nextStage === null) {
+    await generateSubmissionOffloading(input.submissionId);
+  }
   return { currentStage: nextStage, submitted: nextStage === null };
 }
 
@@ -556,6 +598,9 @@ export async function getStudentQuiz(userId: string, quizId: string) {
       ? "not_ready"
       : baseAvailability;
 
+  const reflection =
+    submitted && row.attempt ? await getQuizReflection(row.attempt.id) : null;
+
   return {
     quiz: {
       id: row.id,
@@ -582,6 +627,7 @@ export async function getStudentQuiz(userId: string, quizId: string) {
             row.status === "published" &&
             quizReady &&
             !(attemptTiming?.isExpired ?? false),
+          reflection,
         }
       : null,
     availability,
@@ -1036,5 +1082,30 @@ export async function submitStudentQuiz(input: {
       "QUIZ_SUBMIT_CONFLICT",
     );
   }
+  // Best-effort AI-usage reflection (separate from the academic score, PRD §5.3A).
+  await generateQuizReflection(input.attemptId);
   return result;
+}
+
+export async function regenerateQuizReflection(
+  userId: string,
+  attemptId: string,
+) {
+  const context = await requireStudentContext(userId);
+  const attempt = await findQuizAttemptAccess(attemptId, context.membershipId);
+  if (!attempt) {
+    throw new StudentServiceError(
+      404,
+      "Attempt quiz tidak ditemukan.",
+      "QUIZ_ATTEMPT_NOT_FOUND",
+    );
+  }
+  if (attempt.status !== "submitted") {
+    throw new StudentServiceError(
+      409,
+      "Refleksi hanya tersedia setelah quiz dikumpulkan.",
+    );
+  }
+  const reflection = await generateQuizReflection(attemptId);
+  return { generated: Boolean(reflection), reflection };
 }

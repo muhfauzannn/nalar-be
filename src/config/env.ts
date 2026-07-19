@@ -10,6 +10,10 @@ function required(source: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+function optional(source: NodeJS.ProcessEnv, name: string): string | undefined {
+  return source[name]?.trim() || undefined;
+}
+
 function url(source: NodeJS.ProcessEnv, name: string): URL {
   const value = required(source, name);
 
@@ -92,6 +96,7 @@ function loadEnv(source: NodeJS.ProcessEnv = process.env) {
   return {
     databaseUrl: required(source, "DATABASE_URL"),
     frontendUrl,
+    geminiApiKey: optional(source, "GEMINI_API_KEY"),
     googleClientId: required(source, "GOOGLE_CLIENT_ID"),
     googleClientSecret: required(source, "GOOGLE_CLIENT_SECRET"),
     port: port(source),

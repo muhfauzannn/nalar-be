@@ -105,6 +105,17 @@ export const quizQuestionTypeEnum = pgEnum("quiz_question_type", [
   "multiple_choice",
   "short_answer",
 ]);
+export const tutorModeEnum = pgEnum("tutor_mode", ["hint", "feedback"]);
+export const tutorMessageAuthorEnum = pgEnum("tutor_message_author", [
+  "student",
+  "tutor",
+  "system",
+]);
+export const promptIntentEnum = pgEnum("prompt_intent", [
+  "direct_answer",
+  "explanation_hint",
+  "reflective_evaluative",
+]);
 
 export const school = pgTable("school", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -740,5 +751,189 @@ export const quizAnswer = pgTable(
       sql`(${table.selectedOptionId} is not null and ${table.textAnswer} is null)
         or (${table.selectedOptionId} is null and nullif(btrim(${table.textAnswer}), '') is not null)`,
     ),
+  ],
+);
+
+// Guarded AI tutor conversations are auditable learning records. A conversation
+// belongs to exactly one assignment submission or one quiz attempt; audio itself
+// is never stored, only the transcript the student can also see in the UI.
+export const tutorConversation = pgTable(
+  "tutor_conversation",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submissionId: uuid("submission_id").references(() => submission.id),
+    quizAttemptId: uuid("quiz_attempt_id").references(() => quizAttempt.id),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("tutor_conversation_submission_unique")
+      .on(table.submissionId)
+      .where(sql`${table.submissionId} is not null`),
+    uniqueIndex("tutor_conversation_quiz_attempt_unique")
+      .on(table.quizAttemptId)
+      .where(sql`${table.quizAttemptId} is not null`),
+    check(
+      "tutor_conversation_one_target_check",
+      sql`num_nonnulls(${table.submissionId}, ${table.quizAttemptId}) = 1`,
+    ),
+  ],
+);
+
+export const tutorMessage = pgTable(
+  "tutor_message",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => tutorConversation.id),
+    quizQuestionId: uuid("quiz_question_id").references(() => quizQuestion.id),
+    clientEventId: uuid("client_event_id").notNull(),
+    author: tutorMessageAuthorEnum("author").notNull(),
+    content: text("content").notNull(),
+    mode: tutorModeEnum("mode"),
+    wasRedirected: boolean("was_redirected").default(false).notNull(),
+    modelVersion: text("model_version"),
+    sequence: integer("sequence").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("tutor_message_conversation_sequence_unique").on(
+      table.conversationId,
+      table.sequence,
+    ),
+    unique("tutor_message_conversation_event_unique").on(
+      table.conversationId,
+      table.clientEventId,
+    ),
+    index("tutor_message_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt,
+    ),
+    check("tutor_message_content_check", sql`length(btrim(${table.content})) between 1 and 4000`),
+    check(
+      "tutor_message_metadata_check",
+      sql`(${table.author} = 'student' and ${table.mode} is not null and ${table.modelVersion} is null)
+        or (${table.author} = 'tutor' and ${table.mode} is not null and ${table.modelVersion} is not null)
+        or (${table.author} = 'system' and ${table.mode} is null and ${table.modelVersion} is null)`,
+    ),
+  ],
+);
+
+export const promptClassification = pgTable(
+  "prompt_classification",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    messageId: uuid("message_id")
+      .notNull()
+      .unique()
+      .references(() => tutorMessage.id),
+    intent: promptIntentEnum("intent").notNull(),
+    confidence: numeric("confidence", { precision: 4, scale: 3 }).notNull(),
+    isFallback: boolean("is_fallback").default(false).notNull(),
+    classifierVersion: text("classifier_version").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "prompt_classification_confidence_check",
+      sql`${table.confidence} between 0 and 1`,
+    ),
+  ],
+);
+
+export const offloadingLevelEnum = pgEnum("offloading_level", [
+  "1_ai_as_tool",
+  "2_ai_as_scaffold",
+  "3_partial_offloading",
+  "4_full_offloading",
+]);
+export const aiRelianceLevelEnum = pgEnum("ai_reliance_level", [
+  "none",
+  "low",
+  "moderate",
+  "high",
+]);
+
+// The AI Offloading Index is reflective learning-process feedback, never an
+// academic grade. One result per submitted assignment, computed after Stage 5
+// from the tutor prompt-intent signals and the five-stage artifacts. It must
+// never feed the gradebook (see PRD §5.8 and SCHEMA §12).
+export const offloadingIndexResult = pgTable(
+  "offloading_index_result",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .unique()
+      .references(() => submission.id),
+    level: offloadingLevelEnum("level").notNull(),
+    score: numeric("score", { precision: 5, scale: 2 }).notNull(),
+    intentInput: numeric("intent_input", { precision: 5, scale: 2 }).notNull(),
+    effortInput: numeric("effort_input", { precision: 5, scale: 2 }).notNull(),
+    studentReport: text("student_report").notNull(),
+    recommendations: text("recommendations").array().notNull(),
+    scoringVersion: text("scoring_version").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    check("offloading_index_result_score_check", sql`${table.score} between 0 and 100`),
+    check(
+      "offloading_index_result_intent_input_check",
+      sql`${table.intentInput} between 0 and 100`,
+    ),
+    check(
+      "offloading_index_result_effort_input_check",
+      sql`${table.effortInput} between 0 and 100`,
+    ),
+  ],
+);
+
+export const explanationFactor = pgTable(
+  "explanation_factor",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resultId: uuid("result_id")
+      .notNull()
+      .references(() => offloadingIndexResult.id),
+    factor: text("factor").notNull(),
+    contribution: numeric("contribution", { precision: 5, scale: 2 }).notNull(),
+    plainExplanation: text("plain_explanation").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("explanation_factor_result_factor_unique").on(table.resultId, table.factor),
+  ],
+);
+
+// Quizzes stay separate from the AI Offloading Index (PRD §5.3A). This is a
+// lighter, non-judgmental reflection on how the student used the Guarded Tutor
+// during the attempt. It is not an academic score and never affects the score.
+export const quizUsageReflection = pgTable(
+  "quiz_usage_reflection",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    quizAttemptId: uuid("quiz_attempt_id")
+      .notNull()
+      .unique()
+      .references(() => quizAttempt.id),
+    relianceLevel: aiRelianceLevelEnum("reliance_level").notNull(),
+    studentReport: text("student_report").notNull(),
+    recommendations: text("recommendations").array().notNull(),
+    promptTurnCount: integer("prompt_turn_count").default(0).notNull(),
+    directCount: integer("direct_count").default(0).notNull(),
+    hintCount: integer("hint_count").default(0).notNull(),
+    reflectiveCount: integer("reflective_count").default(0).notNull(),
+    redirectedCount: integer("redirected_count").default(0).notNull(),
+    scoringVersion: text("scoring_version").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    check("quiz_usage_reflection_prompt_turn_check", sql`${table.promptTurnCount} >= 0`),
+    check("quiz_usage_reflection_direct_check", sql`${table.directCount} >= 0`),
+    check("quiz_usage_reflection_hint_check", sql`${table.hintCount} >= 0`),
+    check("quiz_usage_reflection_reflective_check", sql`${table.reflectiveCount} >= 0`),
+    check("quiz_usage_reflection_redirected_check", sql`${table.redirectedCount} >= 0`),
   ],
 );
