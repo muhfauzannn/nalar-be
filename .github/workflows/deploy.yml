@@ -40,6 +40,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
+    if: false
     needs: build
     runs-on: ubuntu-latest
     permissions:
