@@ -1,0 +1,26 @@
+services:
+  be:
+    image: bernalar-be:dokploy
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    env_file:
+      - ../persistent/be.env
+    ports:
+      - "127.0.0.1:8100:8000"
+    restart: unless-stopped
+
+  fe:
+    image: bernalar-fe:dokploy
+    pull_policy: build
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runtime
+    env_file:
+      - ../persistent/fe.env
+    ports:
+      - "127.0.0.1:3100:3000"
+    restart: unless-stopped
