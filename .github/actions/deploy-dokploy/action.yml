@@ -1,0 +1,84 @@
+name: Deploy Dokploy Compose
+description: Trigger a Dokploy Compose deployment and wait until it finishes
+inputs:
+  compose_id:
+    description: Dokploy Compose ID
+    required: true
+  dokploy_api_key:
+    description: Dokploy API key
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Deploy and wait for Dokploy result
+      shell: bash
+      env:
+        DOKPLOY_URL: https://dokploy.muhfauzan.dev
+        COMPOSE_ID: ${{ inputs.compose_id }}
+        DOKPLOY_API_KEY: ${{ inputs.dokploy_api_key }}
+      run: |
+        set -euo pipefail
+        if [ -z "$DOKPLOY_API_KEY" ]; then
+          echo "::error::Missing repository secret DOKPLOY_API_KEY."
+          exit 1
+        fi
+
+        api="$DOKPLOY_URL/api"
+        run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        title="GitHub Actions run $GITHUB_RUN_ID"
+        description="Commit: $GITHUB_SHA; Workflow: $run_url"
+
+        get_deployments() {
+          curl --fail --silent --show-error --get \
+            --data-urlencode "composeId=$COMPOSE_ID" \
+            --header "x-api-key: $DOKPLOY_API_KEY" \
+            "$api/deployment.allByCompose"
+        }
+
+        before="$(get_deployments | jq -r '.[0].deploymentId // ""')"
+        payload="$(jq -cn \
+          --arg composeId "$COMPOSE_ID" \
+          --arg title "$title" \
+          --arg description "$description" \
+          '{composeId:$composeId,title:$title,description:$description}')"
+
+        response_file="$RUNNER_TEMP/dokploy-deploy-response.json"
+        http_code="$(curl --silent --show-error \
+          --output "$response_file" \
+          --write-out '%{http_code}' \
+          --request POST "$api/compose.deploy" \
+          --header "x-api-key: $DOKPLOY_API_KEY" \
+          --header 'content-type: application/json' \
+          --data "$payload")"
+
+        if [[ ! "$http_code" =~ ^2 ]]; then
+          printf 'Dokploy rejected the deploy request (HTTP %s).\n' "$http_code"
+          exit 1
+        fi
+
+        echo "Dokploy accepted the request; waiting for this GitHub run to finish."
+        for attempt in $(seq 1 180); do
+          deployments="$(get_deployments)" || {
+            sleep 10
+            continue
+          }
+
+          deployment="$(jq -c --arg run_url "$run_url" \
+            '[.[] | select((.description // "") | contains($run_url))][0] // empty' \
+            <<< "$deployments")"
+
+          if [[ -n "$deployment" ]]; then
+            deployment_id="$(jq -r '.deploymentId' <<< "$deployment")"
+            status="$(jq -r '.status // "unknown"' <<< "$deployment")"
+            printf 'Dokploy deployment %s: %s\n' "$deployment_id" "$status"
+            case "$status" in
+              done) exit 0 ;;
+              error|cancelled) exit 1 ;;
+            esac
+          fi
+
+          sleep 10
+        done
+
+        echo "Timed out waiting for Dokploy to finish this deployment."
+        exit 1

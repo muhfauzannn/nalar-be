@@ -1,64 +1,51 @@
-name: Build & Deploy (BE)
+name: Deploy Bernalar via Dokploy
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths-ignore:
+      - '.github/workflows/deploy.yml'
+      - '.github/actions/deploy-dokploy/action.yml'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-be
+  group: bernalar-deploy
   cancel-in-progress: false
-
-env:
-  IMAGE: ghcr.io/muhfauzannn/nalar-be
 
 jobs:
   build:
+    name: Build backend and pinned frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
-      packages: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
+      - name: Checkout with frontend submodule
+        uses: actions/checkout@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          persist-credentials: false
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        run: docker buildx build --platform linux/amd64 --target runtime --load -t nalar-be:ci .
+
+      - name: Build frontend image
+        run: |
+          docker buildx build --platform linux/amd64 --target runtime --load \
+            --build-arg VITE_API_URL=https://api.nalar.muhfauzan.dev \
+            --build-arg VITE_APP_URL=https://nalar.muhfauzan.dev \
+            -t nalar-fe:ci frontend
 
   deploy:
-    if: false
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      packages: read
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy through Dokploy
+        uses: ./.github/actions/deploy-dokploy
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GHCR_TOKEN
-          script: |
-            set -e
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            cd /opt/bernalar
-            docker compose pull be
-            docker compose up -d be
-            docker image prune -f
+          compose_id: hOqFxK2FyPY192k4NnXiJ
+          dokploy_api_key: ${{ secrets.DOKPLOY_API_KEY }}
