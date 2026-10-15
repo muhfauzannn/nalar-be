@@ -63,8 +63,8 @@ runs:
             continue
           }
 
-          deployment="$(jq -c --arg run_url "$run_url" \
-            '[.[] | select((.description // "") | contains($run_url))][0] // empty' \
+          deployment="$(jq -c --arg before "$before" --arg run_url "$run_url" --arg commit "$GITHUB_SHA" \
+            '[.[] | select(.deploymentId != $before and ((.description // "") | (contains($run_url) or contains($commit))))][0] // empty' \
             <<< "$deployments")"
 
           if [[ -n "$deployment" ]]; then
