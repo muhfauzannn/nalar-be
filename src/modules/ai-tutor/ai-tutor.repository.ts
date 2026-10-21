@@ -11,7 +11,6 @@ import {
   quizOption,
   quizQuestion,
   rubricCriterion,
-  schoolMembership,
   stageArtifact,
   submission,
   tutorConversation,
@@ -46,15 +45,10 @@ export async function findAssignmentTutorTarget(userId: string, submissionId: st
       courseMembership,
       eq(courseMembership.id, submission.studentCourseMembershipId),
     )
-    .innerJoin(
-      schoolMembership,
-      eq(schoolMembership.id, courseMembership.schoolMembershipId),
-    )
     .where(
       and(
         eq(submission.id, submissionId),
-        eq(schoolMembership.userId, userId),
-        eq(schoolMembership.status, "active"),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         eq(courseMembership.courseId, assignment.courseId),
       ),
@@ -117,15 +111,10 @@ export async function findQuizTutorTarget(
       courseMembership,
       eq(courseMembership.id, quizAttempt.studentCourseMembershipId),
     )
-    .innerJoin(
-      schoolMembership,
-      eq(schoolMembership.id, courseMembership.schoolMembershipId),
-    )
     .where(
       and(
         eq(quizAttempt.id, attemptId),
-        eq(schoolMembership.userId, userId),
-        eq(schoolMembership.status, "active"),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         eq(courseMembership.courseId, quiz.courseId),
       ),
@@ -187,15 +176,10 @@ export async function findAssignmentTutorTurnAccess(
       courseMembership,
       eq(courseMembership.id, submission.studentCourseMembershipId),
     )
-    .innerJoin(
-      schoolMembership,
-      eq(schoolMembership.id, courseMembership.schoolMembershipId),
-    )
     .where(
       and(
         eq(tutorConversation.id, conversationId),
-        eq(schoolMembership.userId, userId),
-        eq(schoolMembership.status, "active"),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         eq(courseMembership.courseId, assignment.courseId),
       ),
@@ -230,18 +214,13 @@ export async function findQuizTutorTurnAccess(
       eq(courseMembership.id, quizAttempt.studentCourseMembershipId),
     )
     .innerJoin(
-      schoolMembership,
-      eq(schoolMembership.id, courseMembership.schoolMembershipId),
-    )
-    .innerJoin(
       quizQuestion,
       and(eq(quizQuestion.id, questionId), eq(quizQuestion.quizId, quiz.id)),
     )
     .where(
       and(
         eq(tutorConversation.id, conversationId),
-        eq(schoolMembership.userId, userId),
-        eq(schoolMembership.status, "active"),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         eq(courseMembership.courseId, quiz.courseId),
       ),

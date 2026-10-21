@@ -21,13 +21,11 @@ import {
   rubric,
   rubricCriterion,
   scenario,
-  school,
-  schoolMemberRole,
-  schoolMembership,
   studentProfile,
   subject,
   user,
 } from "./schema";
+import { referenceSubjects } from "./reference-data";
 
 const DAY = 24 * 60 * 60 * 1_000;
 const latex = String.raw;
@@ -382,10 +380,7 @@ async function seed() {
   const now = new Date();
   const period = academicPeriod(now);
   const ids = {
-    school: id("school:sman-nalar-nusantara"),
     teacherUser: id("user:guru-matematika-demo"),
-    studentMembership: id(`membership:student:${student.id}`),
-    teacherMembership: id("membership:teacher-matematika-demo"),
     year: id(`academic-year:${period.name}`),
     term: id(`academic-term:${period.name}:ganjil`),
     subject: id("subject:matematika-lanjut"),
@@ -468,69 +463,21 @@ async function seed() {
       });
 
     await transaction
-      .insert(school)
-      .values({
-        id: ids.school,
-        name: "SMA Nalar Nusantara",
-        slug: "sma-nalar-nusantara",
-      })
-      .onConflictDoUpdate({
-        target: school.id,
-        set: { name: "SMA Nalar Nusantara", deletedAt: null, updatedAt: now },
-      });
-
-    await transaction
-      .insert(schoolMembership)
-      .values([
-        {
-          id: ids.studentMembership,
-          schoolId: ids.school,
-          userId: student.id,
-          status: "active",
-          joinedAt: daysFromNow(-120),
-        },
-        {
-          id: ids.teacherMembership,
-          schoolId: ids.school,
-          userId: ids.teacherUser,
-          status: "active",
-          joinedAt: daysFromNow(-365),
-        },
-      ])
-      .onConflictDoUpdate({
-        target: schoolMembership.id,
-        set: { status: "active", updatedAt: now },
-      });
-    await transaction
-      .insert(schoolMemberRole)
-      .values([
-        { membershipId: ids.studentMembership, role: "student" },
-        { membershipId: ids.teacherMembership, role: "teacher" },
-      ])
-      .onConflictDoNothing();
-    await transaction
       .insert(studentProfile)
-      .values({ membershipId: ids.studentMembership, gradeLevel: 11 })
+      .values({ userId: student.id, gradeLevel: 11 })
       .onConflictDoUpdate({
-        target: studentProfile.membershipId,
+        target: studentProfile.userId,
         set: { gradeLevel: 11, updatedAt: now },
       });
 
     await transaction
       .update(academicYear)
       .set({ status: "archived", updatedAt: now })
-      .where(
-        and(
-          eq(academicYear.schoolId, ids.school),
-          eq(academicYear.status, "active"),
-          ne(academicYear.id, ids.year),
-        ),
-      );
+      .where(and(eq(academicYear.status, "active"), ne(academicYear.id, ids.year)));
     await transaction
       .insert(academicYear)
       .values({
         id: ids.year,
-        schoolId: ids.school,
         name: period.name,
         startsOn: period.startsOn,
         endsOn: period.endsOn,
@@ -568,9 +515,12 @@ async function seed() {
 
     await transaction
       .insert(subject)
+      .values(referenceSubjects)
+      .onConflictDoNothing({ target: subject.code });
+    await transaction
+      .insert(subject)
       .values({
         id: ids.subject,
-        schoolId: ids.school,
         code: "MAT-L-XI",
         name: "Matematika Lanjut",
       })
@@ -582,7 +532,6 @@ async function seed() {
       .insert(course)
       .values({
         id: ids.course,
-        schoolId: ids.school,
         termId: ids.term,
         subjectId: ids.subject,
         name: "Matematika Lanjut XI",
@@ -606,7 +555,7 @@ async function seed() {
         {
           id: ids.studentCourse,
           courseId: ids.course,
-          schoolMembershipId: ids.studentMembership,
+          userId: student.id,
           role: "student",
           status: "active",
           activatedAt: daysFromNow(-90),
@@ -614,7 +563,7 @@ async function seed() {
         {
           id: ids.teacherCourse,
           courseId: ids.course,
-          schoolMembershipId: ids.teacherMembership,
+          userId: ids.teacherUser,
           role: "teacher",
           status: "active",
           activatedAt: daysFromNow(-120),
@@ -763,7 +712,6 @@ async function seed() {
       .values(
         rubricRows.map((row) => ({
           ...row,
-          schoolId: ids.school,
           lockedAt: now,
         })),
       )
@@ -806,7 +754,6 @@ async function seed() {
       .values([
         {
           id: ids.modelingScenario,
-          schoolId: ids.school,
           subjectId: ids.subject,
           title: "Optimasi Desain Taman Sekolah",
           instructions: latex`Bangun model fungsi luas dan tentukan ukuran optimum dengan aljabar atau turunan. Jelaskan domain model serta periksa apakah solusi masuk akal secara kontekstual.`,
@@ -814,7 +761,6 @@ async function seed() {
         },
         {
           id: ids.investigationScenario,
-          schoolId: ids.school,
           subjectId: ids.subject,
           title: "Investigasi Peluang pada Tes Diagnostik",
           instructions: latex`Analisis model binomial untuk tes dengan 10 butir. Bandingkan \(P(X\ge7)\) pada dua nilai peluang keberhasilan dan interpretasikan perbedaannya.`,
@@ -1005,7 +951,7 @@ async function seed() {
 
   return {
     student,
-    schoolName: "SMA Nalar Nusantara",
+    courseName: "Matematika Lanjut XI",
     courseCount: 1,
     lessonCount: lessonRows.length,
     assignmentCount: 2,
@@ -1018,7 +964,7 @@ try {
   const result = await seed();
   console.log(`Seed selesai untuk ${result.student.name} <${result.student.email}>.`);
   console.log(
-    `${result.courseCount} course, ${result.lessonCount} materi, ${result.assignmentCount} assignment, dan ${result.quizCount} quiz (${result.questionCount} soal) tersedia di ${result.schoolName}.`,
+    `${result.courseCount} course, ${result.lessonCount} materi, ${result.assignmentCount} assignment, dan ${result.quizCount} quiz (${result.questionCount} soal) tersedia di course ${result.courseName}.`,
   );
   process.exit(0);
 } catch (error) {

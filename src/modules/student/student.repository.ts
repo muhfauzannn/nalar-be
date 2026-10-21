@@ -16,9 +16,6 @@ import {
   quizOption,
   quizQuestion,
   rubricCriterion,
-  school,
-  schoolMemberRole,
-  schoolMembership,
   stageArtifact,
   stageProgress,
   studentProfile,
@@ -44,38 +41,17 @@ export type QuizAnswerInput = {
   textAnswer?: string;
 };
 
-export async function findStudentContext(userId: string) {
-  const [context] = await db
-    .select({
-      schoolId: school.id,
-      schoolName: school.name,
-      membershipId: schoolMembership.id,
-      gradeLevel: studentProfile.gradeLevel,
-    })
-    .from(schoolMembership)
-    .innerJoin(school, eq(school.id, schoolMembership.schoolId))
-    .innerJoin(
-      schoolMemberRole,
-      and(
-        eq(schoolMemberRole.membershipId, schoolMembership.id),
-        eq(schoolMemberRole.role, "student"),
-      ),
-    )
-    .leftJoin(studentProfile, eq(studentProfile.membershipId, schoolMembership.id))
-    .where(
-      and(
-        eq(schoolMembership.userId, userId),
-        eq(schoolMembership.status, "active"),
-        sql`${school.deletedAt} is null`,
-      ),
-    )
-    .orderBy(asc(schoolMembership.joinedAt))
+export async function findStudentProfile(userId: string) {
+  const [profile] = await db
+    .select({ gradeLevel: studentProfile.gradeLevel })
+    .from(studentProfile)
+    .where(eq(studentProfile.userId, userId))
     .limit(1);
 
-  return context ?? null;
+  return profile ?? null;
 }
 
-export async function listStudentCourseRows(schoolMembershipId: string) {
+export async function listStudentCourseRows(userId: string) {
   return db
     .select({
       id: course.id,
@@ -91,7 +67,7 @@ export async function listStudentCourseRows(schoolMembershipId: string) {
     .innerJoin(subject, eq(subject.id, course.subjectId))
     .where(
       and(
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
         inArray(course.status, ["published", "archived"]),
@@ -176,7 +152,7 @@ export async function getCourseProgress(courseId: string, enrollmentId: string) 
 
 export async function findStudentCourse(
   courseId: string,
-  schoolMembershipId: string,
+  userId: string,
 ) {
   const [row] = await db
     .select({
@@ -194,7 +170,7 @@ export async function findStudentCourse(
     .where(
       and(
         eq(course.id, courseId),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
         inArray(course.status, ["published", "archived"]),
@@ -302,11 +278,7 @@ export async function listCourseContent(courseId: string, enrollmentId: string) 
       db
         .select({ name: user.name })
         .from(courseMembership)
-        .innerJoin(
-          schoolMembership,
-          eq(schoolMembership.id, courseMembership.schoolMembershipId),
-        )
-        .innerJoin(user, eq(user.id, schoolMembership.userId))
+        .innerJoin(user, eq(user.id, courseMembership.userId))
         .where(
           and(
             eq(courseMembership.courseId, courseId),
@@ -322,7 +294,7 @@ export async function listCourseContent(courseId: string, enrollmentId: string) 
 
 export async function findStudentLesson(
   lessonId: string,
-  schoolMembershipId: string,
+  userId: string,
 ) {
   const [row] = await db
     .select({
@@ -344,7 +316,7 @@ export async function findStudentLesson(
       courseMembership,
       and(
         eq(courseMembership.courseId, course.id),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
       ),
@@ -403,7 +375,9 @@ export async function updateLessonProgress(
       target: [lessonProgress.lessonId, lessonProgress.studentCourseMembershipId],
       set: {
         status,
-        startedAt: sql`coalesce(${lessonProgress.startedAt}, ${now})`,
+        // A raw Date inside sql`` is not serialised by postgres.js (ERR_INVALID_ARG_TYPE
+        // -> HTTP 500), so pass it as an ISO string with an explicit type.
+        startedAt: sql`coalesce(${lessonProgress.startedAt}, ${now.toISOString()}::timestamptz)`,
         completedAt: status === "completed" ? now : null,
         updatedAt: now,
       },
@@ -415,7 +389,7 @@ export async function updateLessonProgress(
 
 export async function findStudentAssignment(
   assignmentId: string,
-  schoolMembershipId: string,
+  userId: string,
 ) {
   const [row] = await db
     .select({
@@ -438,7 +412,7 @@ export async function findStudentAssignment(
       courseMembership,
       and(
         eq(courseMembership.courseId, course.id),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
       ),
@@ -683,7 +657,7 @@ export async function persistStageCompletion(input: {
 
 export async function findSubmissionAccess(
   submissionId: string,
-  schoolMembershipId: string,
+  userId: string,
 ) {
   const [row] = await db
     .select({
@@ -699,7 +673,7 @@ export async function findSubmissionAccess(
       courseMembership,
       and(
         eq(courseMembership.id, submission.studentCourseMembershipId),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         eq(courseMembership.status, "active"),
       ),
@@ -710,7 +684,7 @@ export async function findSubmissionAccess(
   return row ?? null;
 }
 
-export async function findStudentQuiz(quizId: string, schoolMembershipId: string) {
+export async function findStudentQuiz(quizId: string, userId: string) {
   const [row] = await db
     .select({
       id: quiz.id,
@@ -733,7 +707,7 @@ export async function findStudentQuiz(quizId: string, schoolMembershipId: string
       courseMembership,
       and(
         eq(courseMembership.courseId, course.id),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
       ),
@@ -898,7 +872,7 @@ export async function deleteQuizAnswer(
 
 export async function findQuizAttemptAccess(
   attemptId: string,
-  schoolMembershipId: string,
+  userId: string,
 ) {
   const [row] = await db
     .select({
@@ -920,7 +894,7 @@ export async function findQuizAttemptAccess(
       courseMembership,
       and(
         eq(courseMembership.id, quizAttempt.studentCourseMembershipId),
-        eq(courseMembership.schoolMembershipId, schoolMembershipId),
+        eq(courseMembership.userId, userId),
         eq(courseMembership.role, "student"),
         inArray(courseMembership.status, ["active", "completed"]),
       ),

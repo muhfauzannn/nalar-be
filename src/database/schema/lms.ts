@@ -9,7 +9,6 @@ import {
   numeric,
   pgEnum,
   pgTable,
-  primaryKey,
   smallint,
   text,
   timestamp,
@@ -28,17 +27,6 @@ const timestamps = {
     .notNull(),
 };
 
-export const schoolRoleEnum = pgEnum("school_role", [
-  "student",
-  "teacher",
-  "school_admin",
-]);
-export const membershipStatusEnum = pgEnum("membership_status", [
-  "pending",
-  "active",
-  "suspended",
-  "removed",
-]);
 export const academicYearStatusEnum = pgEnum("academic_year_status", [
   "planned",
   "active",
@@ -117,52 +105,14 @@ export const promptIntentEnum = pgEnum("prompt_intent", [
   "reflective_evaluative",
 ]);
 
-export const school = pgTable("school", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  ...timestamps,
-});
-
-export const schoolMembership = pgTable(
-  "school_membership",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    schoolId: uuid("school_id")
-      .notNull()
-      .references(() => school.id),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => user.id),
-    status: membershipStatusEnum("status").default("pending").notNull(),
-    joinedAt: timestamp("joined_at", { withTimezone: true }),
-    ...timestamps,
-  },
-  (table) => [
-    unique("school_membership_school_user_unique").on(table.schoolId, table.userId),
-    index("school_membership_user_status_idx").on(table.userId, table.status),
-    index("school_membership_school_status_idx").on(table.schoolId, table.status),
-  ],
-);
-
-export const schoolMemberRole = pgTable(
-  "school_member_role",
-  {
-    membershipId: uuid("membership_id")
-      .notNull()
-      .references(() => schoolMembership.id),
-    role: schoolRoleEnum("role").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.membershipId, table.role] })],
-);
-
+// There is no school/tenant concept: every registered user can create courses
+// and join others. Roles exist only per course (`course_membership.role`).
 export const studentProfile = pgTable(
   "student_profile",
   {
-    membershipId: uuid("membership_id")
+    userId: uuid("user_id")
       .primaryKey()
-      .references(() => schoolMembership.id),
+      .references(() => user.id),
     gradeLevel: smallint("grade_level").notNull(),
     ...timestamps,
   },
@@ -171,13 +121,11 @@ export const studentProfile = pgTable(
   ],
 );
 
+// Global reference data (not owned by anybody).
 export const academicYear = pgTable(
   "academic_year",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    schoolId: uuid("school_id")
-      .notNull()
-      .references(() => school.id),
     name: text("name").notNull(),
     startsOn: date("starts_on").notNull(),
     endsOn: date("ends_on").notNull(),
@@ -185,10 +133,10 @@ export const academicYear = pgTable(
     ...timestamps,
   },
   (table) => [
-    unique("academic_year_school_name_unique").on(table.schoolId, table.name),
+    unique("academic_year_name_unique").on(table.name),
     check("academic_year_date_order_check", sql`${table.endsOn} > ${table.startsOn}`),
-    uniqueIndex("academic_year_one_active_per_school")
-      .on(table.schoolId)
+    uniqueIndex("academic_year_one_active")
+      .on(sql`(true)`)
       .where(sql`${table.status} = 'active'`),
   ],
 );
@@ -217,41 +165,35 @@ export const subject = pgTable(
   "subject",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    schoolId: uuid("school_id").references(() => school.id),
     code: text("code").notNull(),
     name: text("name").notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("subject_global_code_unique")
-      .on(table.code)
-      .where(sql`${table.schoolId} is null`),
-    uniqueIndex("subject_school_code_unique")
-      .on(table.schoolId, table.code)
-      .where(sql`${table.schoolId} is not null`),
-  ],
+  (table) => [unique("subject_code_unique").on(table.code)],
 );
 
+// A course is created by any user, who becomes its teacher through
+// `course_membership`. Others enroll as students with `join_code` (stored
+// upper-case; null = joining disabled).
 export const course = pgTable(
   "course",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    schoolId: uuid("school_id")
-      .notNull()
-      .references(() => school.id),
-    termId: uuid("term_id")
-      .notNull()
-      .references(() => academicTerm.id),
+    termId: uuid("term_id").references(() => academicTerm.id),
     subjectId: uuid("subject_id")
       .notNull()
       .references(() => subject.id),
     name: text("name").notNull(),
     description: text("description"),
     status: courseStatusEnum("status").default("draft").notNull(),
+    joinCode: text("join_code"),
     ...timestamps,
   },
   (table) => [
-    index("course_school_status_idx").on(table.schoolId, table.status),
+    uniqueIndex("course_join_code_unique")
+      .on(table.joinCode)
+      .where(sql`${table.joinCode} is not null`),
+    index("course_status_idx").on(table.status),
     index("course_term_subject_idx").on(table.termId, table.subjectId),
   ],
 );
@@ -263,9 +205,9 @@ export const courseMembership = pgTable(
     courseId: uuid("course_id")
       .notNull()
       .references(() => course.id),
-    schoolMembershipId: uuid("school_membership_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => schoolMembership.id),
+      .references(() => user.id),
     role: courseRoleEnum("role").notNull(),
     status: enrollmentStatusEnum("status").default("invited").notNull(),
     activatedAt: timestamp("activated_at", { withTimezone: true }),
@@ -275,7 +217,7 @@ export const courseMembership = pgTable(
   (table) => [
     unique("course_membership_course_member_role_unique").on(
       table.courseId,
-      table.schoolMembershipId,
+      table.userId,
       table.role,
     ),
     index("course_membership_course_role_status_idx").on(
@@ -283,10 +225,7 @@ export const courseMembership = pgTable(
       table.role,
       table.status,
     ),
-    index("course_membership_member_status_idx").on(
-      table.schoolMembershipId,
-      table.status,
-    ),
+    index("course_membership_member_status_idx").on(table.userId, table.status),
   ],
 );
 
@@ -401,7 +340,6 @@ export const rubric = pgTable(
   "rubric",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    schoolId: uuid("school_id").references(() => school.id),
     sourceRubricId: uuid("source_rubric_id"),
     name: text("name").notNull(),
     isTemplate: boolean("is_template").default(true).notNull(),
@@ -439,7 +377,6 @@ export const rubricCriterion = pgTable(
 
 export const scenario = pgTable("scenario", {
   id: uuid("id").defaultRandom().primaryKey(),
-  schoolId: uuid("school_id").references(() => school.id),
   subjectId: uuid("subject_id")
     .notNull()
     .references(() => subject.id),

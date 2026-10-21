@@ -1,4 +1,5 @@
 import type { AuthSession } from "../auth/auth";
+import { normalizeShortAnswer, quizDefinitionsAreReady } from "../../lib/quiz-readiness";
 import {
   generateQuizReflection,
   generateSubmissionOffloading,
@@ -11,9 +12,9 @@ import {
   createStudentSubmission,
   findQuizAttemptAccess,
   findStudentAssignment,
-  findStudentContext,
   findStudentCourse,
   findStudentLesson,
+  findStudentProfile,
   findStudentQuiz,
   findSubmissionAccess,
   getCourseProgress,
@@ -66,17 +67,6 @@ export class StudentServiceError extends Error {
     super(message);
     this.name = "StudentServiceError";
   }
-}
-
-async function requireStudentContext(userId: string) {
-  const context = await findStudentContext(userId);
-  if (!context) {
-    throw new StudentServiceError(
-      403,
-      "Akun belum memiliki keanggotaan siswa aktif di sekolah.",
-    );
-  }
-  return context;
 }
 
 function isOpenForWork(item: {
@@ -146,7 +136,7 @@ function getQuizActivityStatus(item: {
 }
 
 export async function getStudentShell(session: AuthSession) {
-  const context = await findStudentContext(session.user.id);
+  const profile = await findStudentProfile(session.user.id);
   return {
     user: {
       id: session.user.id,
@@ -154,20 +144,12 @@ export async function getStudentShell(session: AuthSession) {
       email: session.user.email,
       image: session.user.image,
     },
-    school: context
-      ? {
-          id: context.schoolId,
-          name: context.schoolName,
-          gradeLevel: context.gradeLevel,
-        }
-      : null,
+    profile,
   };
 }
 
 export async function listStudentCourses(userId: string) {
-  const context = await findStudentContext(userId);
-  if (!context) return { school: null, courses: [] };
-  const rows = await listStudentCourseRows(context.membershipId);
+  const rows = await listStudentCourseRows(userId);
   const courses = await Promise.all(
     rows.map(async (row) => ({
       ...row,
@@ -175,22 +157,12 @@ export async function listStudentCourses(userId: string) {
     })),
   );
 
-  return { school: { id: context.schoolId, name: context.schoolName }, courses };
+  return { courses };
 }
 
 export async function getStudentDashboard(session: AuthSession) {
-  const context = await findStudentContext(session.user.id);
-  if (!context) {
-    return {
-      user: { name: session.user.name },
-      school: null,
-      courses: [],
-      upcoming: [],
-      summary: { activeCourses: 0, completedItems: 0, totalItems: 0, progress: 0 },
-    };
-  }
-
-  const rows = await listStudentCourseRows(context.membershipId);
+  const profile = await findStudentProfile(session.user.id);
+  const rows = await listStudentCourseRows(session.user.id);
   const courses = await Promise.all(
     rows.map(async (row) => ({
       ...row,
@@ -249,11 +221,7 @@ export async function getStudentDashboard(session: AuthSession) {
 
   return {
     user: { name: session.user.name },
-    school: {
-      id: context.schoolId,
-      name: context.schoolName,
-      gradeLevel: context.gradeLevel,
-    },
+    profile,
     courses,
     upcoming,
     summary: {
@@ -266,8 +234,7 @@ export async function getStudentDashboard(session: AuthSession) {
 }
 
 export async function getStudentCourse(userId: string, courseId: string) {
-  const context = await requireStudentContext(userId);
-  const courseRow = await findStudentCourse(courseId, context.membershipId);
+  const courseRow = await findStudentCourse(courseId, userId);
   if (!courseRow) throw new StudentServiceError(404, "Course tidak ditemukan.");
 
   const [content, progress] = await Promise.all([
@@ -328,8 +295,7 @@ export async function getStudentCourse(userId: string, courseId: string) {
 }
 
 export async function getStudentLesson(userId: string, lessonId: string) {
-  const context = await requireStudentContext(userId);
-  const lessonRow = await findStudentLesson(lessonId, context.membershipId);
+  const lessonRow = await findStudentLesson(lessonId, userId);
   if (!lessonRow) throw new StudentServiceError(404, "Materi tidak ditemukan.");
   return lessonRow;
 }
@@ -347,8 +313,7 @@ export async function setStudentLessonProgress(
 }
 
 export async function getStudentAssignment(userId: string, assignmentId: string) {
-  const context = await requireStudentContext(userId);
-  const row = await findStudentAssignment(assignmentId, context.membershipId);
+  const row = await findStudentAssignment(assignmentId, userId);
   if (!row) {
     throw new StudentServiceError(
       404,
@@ -378,8 +343,7 @@ export async function regenerateSubmissionOffloading(
   userId: string,
   submissionId: string,
 ) {
-  const context = await requireStudentContext(userId);
-  const access = await findSubmissionAccess(submissionId, context.membershipId);
+  const access = await findSubmissionAccess(submissionId, userId);
   if (!access) {
     throw new StudentServiceError(
       404,
@@ -425,8 +389,7 @@ export async function completeStudentStage(input: {
   stage: WorkflowStage;
   content?: string;
 }) {
-  const context = await requireStudentContext(input.userId);
-  const access = await findSubmissionAccess(input.submissionId, context.membershipId);
+  const access = await findSubmissionAccess(input.submissionId, input.userId);
   if (!access) {
     throw new StudentServiceError(
       404,
@@ -523,8 +486,7 @@ export async function completeStudentStage(input: {
 }
 
 export async function getStudentQuiz(userId: string, quizId: string) {
-  const context = await requireStudentContext(userId);
-  const row = await findStudentQuiz(quizId, context.membershipId);
+  const row = await findStudentQuiz(quizId, userId);
   if (!row) {
     throw new StudentServiceError(404, "Quiz tidak ditemukan.", "QUIZ_NOT_FOUND");
   }
@@ -641,8 +603,7 @@ export async function getStudentQuiz(userId: string, quizId: string) {
 }
 
 export async function startStudentQuiz(userId: string, quizId: string) {
-  const context = await requireStudentContext(userId);
-  const row = await findStudentQuiz(quizId, context.membershipId);
+  const row = await findStudentQuiz(quizId, userId);
   if (!row) {
     throw new StudentServiceError(404, "Quiz tidak ditemukan.", "QUIZ_NOT_FOUND");
   }
@@ -777,20 +738,6 @@ function groupQuizQuestionDefinitions(rows: QuizQuestionDefinition[]) {
   return questions;
 }
 
-function quizDefinitionsAreReady(rows: QuizQuestionDefinition[]) {
-  const questions = groupQuizQuestionDefinitions(rows);
-  if (questions.size === 0) return false;
-
-  return Array.from(questions.values()).every((questionRows) => {
-    const question = questionRows[0];
-    if (!question) return false;
-    return question.questionType === "multiple_choice"
-      ? questionRows.filter((row) => row.optionId).length >= 2 &&
-          questionRows.filter((row) => row.isCorrect).length === 1
-      : (question.acceptedAnswers?.length ?? 0) > 0;
-  });
-}
-
 function validateAnswers(
   definitionRows: QuizQuestionDefinition[],
   answers: QuizAnswerInput[],
@@ -848,14 +795,6 @@ function validateAnswers(
   return validated;
 }
 
-function normalizeShortAnswer(value: string) {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/gu, " ")
-    .toLocaleLowerCase("id-ID");
-}
-
 function gradeAnswers(
   definitionRows: QuizQuestionDefinition[],
   answers: QuizAnswerInput[],
@@ -892,8 +831,7 @@ export async function saveStudentQuizAnswers(input: {
   attemptId: string;
   answers: QuizAnswerInput[];
 }) {
-  const context = await requireStudentContext(input.userId);
-  const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
+  const attempt = await findQuizAttemptAccess(input.attemptId, input.userId);
   if (!attempt) {
     throw new StudentServiceError(
       404,
@@ -948,8 +886,7 @@ export async function deleteStudentQuizAnswer(input: {
   attemptId: string;
   questionId: string;
 }) {
-  const context = await requireStudentContext(input.userId);
-  const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
+  const attempt = await findQuizAttemptAccess(input.attemptId, input.userId);
   if (!attempt) {
     throw new StudentServiceError(
       404,
@@ -1008,8 +945,7 @@ export async function submitStudentQuiz(input: {
   attemptId: string;
   answers: QuizAnswerInput[];
 }) {
-  const context = await requireStudentContext(input.userId);
-  const attempt = await findQuizAttemptAccess(input.attemptId, context.membershipId);
+  const attempt = await findQuizAttemptAccess(input.attemptId, input.userId);
   if (!attempt) {
     throw new StudentServiceError(
       404,
@@ -1091,8 +1027,7 @@ export async function regenerateQuizReflection(
   userId: string,
   attemptId: string,
 ) {
-  const context = await requireStudentContext(userId);
-  const attempt = await findQuizAttemptAccess(attemptId, context.membershipId);
+  const attempt = await findQuizAttemptAccess(attemptId, userId);
   if (!attempt) {
     throw new StudentServiceError(
       404,
