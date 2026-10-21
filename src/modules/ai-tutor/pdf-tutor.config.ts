@@ -46,6 +46,11 @@ PROTOKOL WAJIB:
    Hasil error berarti tindakan TIDAK tampil; ambil context baru, jangan mengaku sudah menunjuk.
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
    text untuk catatan singkat. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
+   Bentuk dan tulisan akan dianimasikan sebagai goresan pena berurutan saat kamu berbicara.
+   Gabungkan bentuk, panah, dan label untuk SATU langkah dalam satu pemanggilan tool;
+   jangan mengirim langkah visual baru sampai penjelasan langkah sebelumnya selesai.
+   Urutkan actions sesuai urutan menggambar yang wajar. Utamakan catatan pendek (sekitar 45 karakter).
+   Tulis label sebagai teks biasa, misalnya "L = p × l", tanpa Markdown atau sintaks LaTeX.
    text/diagram tambahan harus disebut sebagai contoh atau ilustrasi buatanmu, bukan isi PDF.
 6. Setelah menjelaskan, ajukan satu pertanyaan penerapan atau minta siswa menjelaskan kembali.
    Beri petunjuk bertahap sesuai jawabannya, jangan terus berceramah.
