@@ -536,3 +536,38 @@ export async function reorderResources(lessonId: string, orderedIds: string[]) {
     await reorderSiblings(tx, "learning_resource", lessonId, orderedIds);
   });
 }
+
+export async function getLessonEditor(lessonId: string) {
+  const [row] = await db
+    .select({
+      id: lesson.id,
+      title: lesson.title,
+      content: lesson.content,
+      status: lesson.status,
+      moduleId: learningModule.id,
+      moduleTitle: learningModule.title,
+      courseId: course.id,
+      courseName: course.name,
+    })
+    .from(lesson)
+    .innerJoin(learningModule, eq(learningModule.id, lesson.moduleId))
+    .innerJoin(course, eq(course.id, learningModule.courseId))
+    .where(eq(lesson.id, lessonId))
+    .limit(1);
+  if (!row) return null;
+
+  const resources = await db
+    .select({
+      id: learningResource.id,
+      type: learningResource.type,
+      title: learningResource.title,
+      content: learningResource.content,
+      url: learningResource.url,
+      position: learningResource.position,
+    })
+    .from(learningResource)
+    .where(eq(learningResource.lessonId, lessonId))
+    .orderBy(asc(learningResource.position));
+
+  return { lesson: row, resources };
+}

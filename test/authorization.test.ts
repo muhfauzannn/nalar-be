@@ -47,6 +47,7 @@ const probes: Probe[] = [
   { name: "arsip modul", method: "DELETE", path: (f) => `/modules/${f.moduleId}` },
   { name: "tambah lesson", method: "POST", path: (f) => `/modules/${f.moduleId}/lessons`, body: () => ({ title: "X" }) },
   { name: "urut lesson", method: "PUT", path: (f) => `/modules/${f.moduleId}/lessons/order`, body: (f) => ({ ids: [f.lessonId] }) },
+  { name: "baca lesson", method: "GET", path: (f) => `/lessons/${f.lessonId}` },
   { name: "ubah lesson", method: "PATCH", path: (f) => `/lessons/${f.lessonId}`, body: () => ({ title: "X" }) },
   { name: "arsip lesson", method: "DELETE", path: (f) => `/lessons/${f.lessonId}` },
   { name: "tambah resource", method: "POST", path: (f) => `/lessons/${f.lessonId}/resources`, body: () => ({ type: "text", title: "X", content: "isi" }) },

@@ -29,7 +29,7 @@ export class EnrollmentServiceError extends Error {
 // Only FAILED attempts are counted and a success never clears them: otherwise
 // whoever knows one valid code could alternate it with guesses forever.
 export const joinRateLimiter = createRateLimiter({
-  maxFailures: 10,
+  maxEvents: 10,
   windowMs: 10 * 60 * 1_000,
 });
 
@@ -47,7 +47,7 @@ export async function joinCourseWithCode(userId: string, rawCode: string) {
   }
 
   const fail = () => {
-    joinRateLimiter.recordFailure(userId);
+    joinRateLimiter.record(userId);
     return new EnrollmentServiceError(404, INVALID, "JOIN_CODE_INVALID");
   };
 

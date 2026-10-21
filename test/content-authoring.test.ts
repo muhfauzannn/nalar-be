@@ -285,10 +285,8 @@ describe("resources", () => {
       }
     }
     // And nothing slipped in.
-    const lesson = (await api(teacher, "GET", `/api/manage/lessons/${lessonId}`)); // no such route: 404 is fine
-    expect(lesson.status).toBe(404);
-    const editor = await api(teacher, "GET", `/api/manage/courses/${(await api(teacher, "GET", "/api/manage/courses")).body.courses[0].id}`);
-    expect(editor.body.modules[0].lessons[0].resources).toEqual([]);
+    const lesson = await api(teacher, "GET", `/api/manage/lessons/${lessonId}`);
+    expect(lesson.body.resources).toEqual([]);
   });
 
   test("an update cannot sneak a hostile URL in either", async () => {
@@ -352,5 +350,29 @@ describe("resources", () => {
     const over = await api(teacher, "POST", resourcesOf(lessonId), { type: "text", title: "R50", content: "x" });
     expect(over.status).toBe(409);
     expect(over.body.code).toBe("LIMIT_REACHED");
+  });
+});
+
+describe("the lesson editor payload", () => {
+  test("returns the lesson with its resources and where it lives", async () => {
+    const teacher = await newUser("teacher");
+    const { course, lessonId } = await courseWithLesson(teacher);
+    await api(teacher, "POST", `/api/manage/lessons/${lessonId}/resources`, {
+      type: "file",
+      title: "PDF",
+      url: "https://example.com/a.pdf",
+    });
+    const reply = await api(teacher, "GET", `/api/manage/lessons/${lessonId}`);
+    expect(reply.status).toBe(200);
+    expect(reply.body.lesson).toMatchObject({
+      id: lessonId,
+      title: "Pengenalan",
+      status: "published",
+      moduleTitle: "Modul 1",
+      courseId: course.id,
+    });
+    expect(reply.body.lesson.content).toContain("tebal");
+    expect(reply.body.resources).toHaveLength(1);
+    expect(reply.body.resources[0]).toMatchObject({ type: "file", url: "https://example.com/a.pdf" });
   });
 });

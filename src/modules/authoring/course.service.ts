@@ -17,6 +17,7 @@ import {
   findTeacherModule,
   findTeacherResource,
   getCourseEditor,
+  getLessonEditor,
   listActiveScenarios,
   listSubjects,
   listTeacherCourses,
@@ -215,6 +216,13 @@ export async function addLesson(
 ) {
   if (!(await findTeacherModule(userId, moduleId))) throw notFound();
   return createLesson(moduleId, input);
+}
+
+export async function getMyLesson(userId: string, lessonId: string) {
+  if (!(await findTeacherLesson(userId, lessonId))) throw notFound();
+  const editor = await getLessonEditor(lessonId);
+  if (!editor) throw notFound();
+  return editor;
 }
 
 export async function editLesson(

@@ -43,7 +43,7 @@ describe("join codes", () => {
 describe("failure rate limiter", () => {
   function clocked() {
     let now = 1_000_000;
-    const limiter = createRateLimiter({ maxFailures: 3, windowMs: 60_000, now: () => now });
+    const limiter = createRateLimiter({ maxEvents: 3, windowMs: 60_000, now: () => now });
     return { limiter, advance: (ms: number) => (now += ms) };
   }
 
@@ -51,7 +51,7 @@ describe("failure rate limiter", () => {
     const { limiter, advance } = clocked();
     for (let index = 0; index < 3; index += 1) {
       expect(limiter.check("user").allowed).toBe(true);
-      limiter.recordFailure("user");
+      limiter.record("user");
       advance(1_000);
     }
     const decision = limiter.check("user");
@@ -62,7 +62,7 @@ describe("failure rate limiter", () => {
 
   test("failures expire after the window and keys are independent", () => {
     const { limiter, advance } = clocked();
-    for (let index = 0; index < 3; index += 1) limiter.recordFailure("a");
+    for (let index = 0; index < 3; index += 1) limiter.record("a");
     expect(limiter.check("a").allowed).toBe(false);
     expect(limiter.check("b").allowed).toBe(true);
     advance(60_001);
@@ -71,7 +71,7 @@ describe("failure rate limiter", () => {
 
   test("reset clears a key", () => {
     const { limiter } = clocked();
-    for (let index = 0; index < 3; index += 1) limiter.recordFailure("a");
+    for (let index = 0; index < 3; index += 1) limiter.record("a");
     limiter.reset("a");
     expect(limiter.check("a").allowed).toBe(true);
   });

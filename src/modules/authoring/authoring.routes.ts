@@ -35,6 +35,7 @@ import {
   editModule,
   editResource,
   getMyCourse,
+  getMyLesson,
   listAuthoringScenarios,
   listAuthoringSubjects,
   listMyCourses,
@@ -151,6 +152,10 @@ authoringRoutes.put("/modules/:moduleId/lessons/order", async (context) => {
     await orderLessons(me(context), param(context, "moduleId", "ID modul"), ids),
   );
 });
+
+authoringRoutes.get("/lessons/:lessonId", async (context) =>
+  context.json(await getMyLesson(me(context), param(context, "lessonId", "ID lesson"))),
+);
 
 authoringRoutes.patch("/lessons/:lessonId", async (context) => {
   const patch = parseLessonPatch(await readObject(context.req.raw));

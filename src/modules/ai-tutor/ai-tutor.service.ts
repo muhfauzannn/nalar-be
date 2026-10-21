@@ -9,6 +9,7 @@ import {
 } from "@google/genai";
 
 import { env } from "../../config/env";
+import { createRateLimiter } from "../../lib/rate-limit";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
@@ -30,6 +31,14 @@ const GEMINI_LIVE_VOICE = "Kore";
 const MAX_PROMPT_LENGTH = 2_000;
 const MAX_REPLY_LENGTH = 4_000;
 
+// Every session mints a Gemini Live token, and anyone can now create a course and
+// enrol a second account in it. Reconnecting after a mode switch is normal use;
+// 30 sessions per 10 minutes is far above that and far below abuse.
+export const tutorSessionLimiter = createRateLimiter({
+  maxEvents: 30,
+  windowMs: 10 * 60 * 1_000,
+});
+
 export type AiTutorErrorCode =
   | "AI_TUTOR_UNAVAILABLE"
   | "AI_TUTOR_TARGET_NOT_FOUND"
@@ -39,11 +48,12 @@ export type AiTutorErrorCode =
   | "AI_TUTOR_CONVERSATION_NOT_FOUND"
   | "AI_TUTOR_MESSAGE_INVALID"
   | "AI_TUTOR_MESSAGE_NOT_CLASSIFIED"
-  | "AI_TUTOR_SESSION_FAILED";
+  | "AI_TUTOR_SESSION_FAILED"
+  | "AI_TUTOR_RATE_LIMITED";
 
 export class AiTutorServiceError extends Error {
   constructor(
-    public readonly status: 400 | 403 | 404 | 409 | 503,
+    public readonly status: 400 | 403 | 404 | 409 | 429 | 503,
     message: string,
     public readonly code: AiTutorErrorCode,
   ) {
@@ -86,6 +96,16 @@ export async function createAiTutorSession(input: {
   target: TutorTargetInput;
   mode: TutorMode;
 }) {
+  const limit = tutorSessionLimiter.check(input.userId);
+  if (!limit.allowed) {
+    throw new AiTutorServiceError(
+      429,
+      "Terlalu banyak sesi AI Tutor dalam waktu singkat. Coba lagi beberapa menit lagi.",
+      "AI_TUTOR_RATE_LIMITED",
+    );
+  }
+  tutorSessionLimiter.record(input.userId);
+
   if (!env.geminiApiKey) {
     throw new AiTutorServiceError(
       503,

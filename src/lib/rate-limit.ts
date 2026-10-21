@@ -1,4 +1,4 @@
-// In-memory failure limiter. The API runs as one process (see
+// In-memory sliding-window event limiter. The API runs as one process (see
 // docker-compose.dokploy.yml), so a Map is enough; the counters reset on
 // restart and are NOT shared between instances - move this to the database or
 // Redis before running more than one replica.
@@ -7,7 +7,7 @@ export type RateLimitDecision =
   | { allowed: false; retryAfterSeconds: number };
 
 export function createRateLimiter(options: {
-  maxFailures: number;
+  maxEvents: number;
   windowMs: number;
   now?: () => number;
 }) {
@@ -30,7 +30,7 @@ export function createRateLimiter(options: {
   return {
     check(key: string): RateLimitDecision {
       const kept = recent(key);
-      if (kept.length < options.maxFailures) return { allowed: true };
+      if (kept.length < options.maxEvents) return { allowed: true };
       const oldest = kept[0] ?? now();
       return {
         allowed: false,
@@ -40,7 +40,7 @@ export function createRateLimiter(options: {
         ),
       };
     },
-    recordFailure(key: string) {
+    record(key: string) {
       sweep();
       failures.set(key, [...recent(key), now()]);
     },
