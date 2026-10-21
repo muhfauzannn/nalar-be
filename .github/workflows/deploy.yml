@@ -50,8 +50,31 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Test
+      - name: Start an S3-compatible server (for the storage tests)
+        run: |
+          docker run -d --name s3 -p 9000:9000 \
+            -e RUSTFS_ACCESS_KEY=rustfsadmin -e RUSTFS_SECRET_KEY=rustfsadmin \
+            rustfs/rustfs@sha256:9ca9559533b537d10482fe923288b676ad08f92a7069d9a17327fbae3cab688b
+          for attempt in $(seq 1 30); do
+            if AWS_ACCESS_KEY_ID=rustfsadmin AWS_SECRET_ACCESS_KEY=rustfsadmin AWS_DEFAULT_REGION=auto \
+               aws --endpoint-url http://localhost:9000 s3 mb s3://nalar-test; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs s3
+          exit 1
+
+      - name: Test (file storage on disk)
         run: bun test
+
+      - name: Test (file storage on S3)
+        run: bun test test/storage.test.ts test/resource-files.test.ts
+        env:
+          TEST_S3_ENDPOINT: http://localhost:9000
+          TEST_S3_BUCKET: nalar-test
+          TEST_S3_ACCESS_KEY_ID: rustfsadmin
+          TEST_S3_SECRET_ACCESS_KEY: rustfsadmin
 
   build:
     name: Build backend and pinned frontend

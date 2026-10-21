@@ -1,7 +1,10 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 
+import { fileResponse } from "../../lib/file-response";
+import { formatBytes, MAX_PDF_BYTES } from "../../lib/pdf-upload";
 import { requireSession, type AuthVariables } from "../auth/auth.middleware";
-import { readObject, uuid } from "./authoring.shared";
+import { readForm, readObject, uuid } from "./authoring.shared";
 import {
   parseAssignmentPatch,
   parseCoursePatch,
@@ -17,6 +20,8 @@ import {
   parseQuestion,
   parseQuizPatch,
   parseResource,
+  parseResourceEdit,
+  parseResourceUpload,
 } from "./authoring.parsers";
 import {
   copyMyAssignment,
@@ -29,6 +34,7 @@ import {
   addLesson,
   addModule,
   addResource,
+  addResourceFile,
   createCourse,
   disableJoinCode,
   editLesson,
@@ -36,6 +42,7 @@ import {
   editResource,
   getMyCourse,
   getMyLesson,
+  getMyResourceFile,
   listAuthoringScenarios,
   listAuthoringSubjects,
   listMyCourses,
@@ -44,6 +51,7 @@ import {
   orderResources,
   regenerateJoinCode,
   removeResource,
+  replaceResourceUpload,
   updateMyCourse,
 } from "./course.service";
 import {
@@ -190,11 +198,40 @@ authoringRoutes.put("/lessons/:lessonId/resources/order", async (context) => {
 });
 
 authoringRoutes.patch("/resources/:resourceId", async (context) => {
-  const input = parseResource(await readObject(context.req.raw));
+  const edit = parseResourceEdit(await readObject(context.req.raw));
   return context.json(
-    await editResource(me(context), param(context, "resourceId", "ID resource"), input),
+    await editResource(me(context), param(context, "resourceId", "ID resource"), edit),
   );
 });
+
+// Refuses an oversized body before it is buffered (the form adds a little framing).
+const uploadLimit = bodyLimit({
+  maxSize: MAX_PDF_BYTES + 512 * 1024,
+  onError: (context) =>
+    context.json({ error: `File terlalu besar (maksimal ${formatBytes(MAX_PDF_BYTES)}).` }, 413),
+});
+
+authoringRoutes.post("/lessons/:lessonId/resources/upload", uploadLimit, async (context) => {
+  const upload = await parseResourceUpload(await readForm(context.req.raw));
+  return context.json(
+    await addResourceFile(me(context), param(context, "lessonId", "ID lesson"), upload),
+    201,
+  );
+});
+
+authoringRoutes.put("/resources/:resourceId/file", uploadLimit, async (context) => {
+  const upload = await parseResourceUpload(await readForm(context.req.raw));
+  return context.json(
+    await replaceResourceUpload(me(context), param(context, "resourceId", "ID resource"), upload),
+  );
+});
+
+authoringRoutes.get("/resources/:resourceId/file", async (context) =>
+  fileResponse(
+    context,
+    await getMyResourceFile(me(context), param(context, "resourceId", "ID resource")),
+  ),
+);
 
 authoringRoutes.delete("/resources/:resourceId", async (context) =>
   context.json(await removeResource(me(context), param(context, "resourceId", "ID resource"))),

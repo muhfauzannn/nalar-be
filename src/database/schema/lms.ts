@@ -280,16 +280,27 @@ export const learningResource = pgTable(
     title: text("title").notNull(),
     content: text("content"),
     url: text("url"),
+    // An uploaded PDF (type 'file'): `file_key` is the server-generated storage key,
+    // `file_name` the sanitised name shown to people. Never both a url and a file.
+    fileKey: text("file_key"),
+    fileName: text("file_name"),
+    fileSize: integer("file_size"),
     position: integer("position").notNull(),
     ...timestamps,
   },
   (table) => [
     unique("learning_resource_lesson_position_unique").on(table.lessonId, table.position),
+    unique("learning_resource_file_key_unique").on(table.fileKey),
     check("learning_resource_position_check", sql`${table.position} > 0`),
     check(
       "learning_resource_payload_check",
-      sql`(${table.type} = 'text' and ${table.content} is not null and ${table.url} is null)
-        or (${table.type} in ('link', 'file') and ${table.url} is not null)`,
+      sql`(${table.type} = 'text' and ${table.content} is not null and ${table.url} is null
+          and ${table.fileKey} is null and ${table.fileName} is null and ${table.fileSize} is null)
+        or (${table.type} in ('link', 'file') and ${table.url} is not null
+          and ${table.fileKey} is null and ${table.fileName} is null and ${table.fileSize} is null)
+        or (${table.type} = 'file' and ${table.url} is null
+          and ${table.fileKey} is not null and ${table.fileName} is not null
+          and ${table.fileSize} is not null and ${table.fileSize} > 0)`,
     ),
   ],
 );

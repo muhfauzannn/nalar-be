@@ -14,6 +14,7 @@ import {
   findStudentAssignment,
   findStudentCourse,
   findStudentLesson,
+  findStudentResourceFile,
   findStudentProfile,
   findStudentQuiz,
   findSubmissionAccess,
@@ -298,6 +299,12 @@ export async function getStudentLesson(userId: string, lessonId: string) {
   const lessonRow = await findStudentLesson(lessonId, userId);
   if (!lessonRow) throw new StudentServiceError(404, "Materi tidak ditemukan.");
   return lessonRow;
+}
+
+export async function getStudentResourceFile(userId: string, resourceId: string) {
+  const file = await findStudentResourceFile(resourceId, userId);
+  if (!file) throw new StudentServiceError(404, "File tidak ditemukan.");
+  return file;
 }
 
 export async function setStudentLessonProgress(

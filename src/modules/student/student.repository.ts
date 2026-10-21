@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../../database/client";
+import { publicResource } from "../../lib/pdf-upload";
 import {
   assignment,
   course,
@@ -340,20 +341,58 @@ export async function findStudentLesson(
 
   if (!row) return null;
 
-  const resources = await db
-    .select({
-      id: learningResource.id,
-      type: learningResource.type,
-      title: learningResource.title,
-      content: learningResource.content,
-      url: learningResource.url,
-      position: learningResource.position,
-    })
-    .from(learningResource)
-    .where(eq(learningResource.lessonId, lessonId))
-    .orderBy(asc(learningResource.position));
+  const resources = (
+    await db
+      .select({
+        id: learningResource.id,
+        type: learningResource.type,
+        title: learningResource.title,
+        content: learningResource.content,
+        url: learningResource.url,
+        fileName: learningResource.fileName,
+        fileSize: learningResource.fileSize,
+        position: learningResource.position,
+      })
+      .from(learningResource)
+      .where(eq(learningResource.lessonId, lessonId))
+      .orderBy(asc(learningResource.position))
+  ).map(publicResource);
 
   return { ...row, resources };
+}
+
+// Same rule as reading the lesson itself: an active or completed student of the
+// course, and the lesson, its module and the course are all visible to students.
+export async function findStudentResourceFile(resourceId: string, userId: string) {
+  const [row] = await db
+    .select({
+      key: learningResource.fileKey,
+      name: learningResource.fileName,
+      size: learningResource.fileSize,
+    })
+    .from(learningResource)
+    .innerJoin(lesson, eq(lesson.id, learningResource.lessonId))
+    .innerJoin(learningModule, eq(learningModule.id, lesson.moduleId))
+    .innerJoin(course, eq(course.id, learningModule.courseId))
+    .innerJoin(
+      courseMembership,
+      and(
+        eq(courseMembership.courseId, course.id),
+        eq(courseMembership.userId, userId),
+        eq(courseMembership.role, "student"),
+        inArray(courseMembership.status, ["active", "completed"]),
+      ),
+    )
+    .where(
+      and(
+        eq(learningResource.id, resourceId),
+        eq(lesson.status, "published"),
+        eq(learningModule.status, "published"),
+        inArray(course.status, ["published", "archived"]),
+      ),
+    )
+    .limit(1);
+  return row?.key && row.name && row.size ? { key: row.key, name: row.name, size: row.size } : null;
 }
 
 export async function updateLessonProgress(

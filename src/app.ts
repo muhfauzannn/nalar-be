@@ -8,6 +8,7 @@ import {
   AuthoringRequestError,
   AuthoringServiceError,
 } from "./modules/authoring/authoring.shared";
+import { StorageUnavailableError } from "./lib/file-storage";
 import { enrollmentRoutes } from "./modules/enrollment/enrollment.routes";
 import { EnrollmentServiceError } from "./modules/enrollment/enrollment.service";
 import { AiTutorRequestError, aiTutorRoutes } from "./modules/ai-tutor/ai-tutor.routes";
@@ -65,6 +66,9 @@ app.onError((error, context) => {
   }
   if (error instanceof RequestValidationError) {
     return context.json({ error: error.message }, error.status);
+  }
+  if (error instanceof StorageUnavailableError) {
+    return context.json({ error: error.message, code: "STORAGE_UNAVAILABLE" }, 503);
   }
   return context.json({ error: "Terjadi kesalahan pada server." }, 500);
 });

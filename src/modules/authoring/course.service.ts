@@ -1,5 +1,8 @@
 import { generateJoinCode } from "../../lib/join-code";
+import { fileStorage, newResourceKey, removeQuietly } from "../../lib/file-storage";
+import { formatBytes, USER_PDF_BYTES_LIMIT } from "../../lib/pdf-upload";
 import {
+  AuthoringRequestError,
   AuthoringServiceError,
   isUniqueViolation,
   notFound,
@@ -7,6 +10,7 @@ import {
 import {
   countTeachingCourses,
   createCourseWithTeacher,
+  createFileResource,
   createLesson,
   createModule,
   createResource,
@@ -24,12 +28,16 @@ import {
   reorderLessons,
   reorderModules,
   reorderResources,
+  replaceResourceFile,
   setCourseJoinCode,
+  storedBytesOf,
   updateCourse,
   updateLesson,
   updateModule,
   updateResource,
+  updateResourceText,
   type ResourceInput,
+  type StoredFile,
 } from "./course.repository";
 
 export type CourseStatus = "draft" | "published" | "archived";
@@ -254,16 +262,113 @@ export async function addResource(userId: string, lessonId: string, input: Resou
   return createResource(lessonId, input);
 }
 
-export async function editResource(userId: string, resourceId: string, input: ResourceInput) {
-  if (!(await findTeacherResource(userId, resourceId))) throw notFound();
-  await updateResource(resourceId, input);
+// "replace": the resource becomes exactly what was sent (text, link or URL-file).
+// "details": only the title/description of an uploaded file changed.
+export type ResourceEdit =
+  | ({ kind: "replace" } & ResourceInput)
+  | { kind: "details"; title: string; content: string | null };
+
+export type ResourceUpload = {
+  title: string;
+  content: string | null;
+  file: { name: string; bytes: Uint8Array };
+};
+
+export async function editResource(userId: string, resourceId: string, edit: ResourceEdit) {
+  const existing = await findTeacherResource(userId, resourceId);
+  if (!existing) throw notFound();
+
+  if (edit.kind === "details") {
+    if (!existing.fileKey) throw new AuthoringRequestError("URL resource wajib diisi.");
+    await updateResourceText(resourceId, { title: edit.title, content: edit.content });
+  } else {
+    const { kind: _kind, ...input } = edit;
+    await updateResource(resourceId, input);
+    // The resource is no longer an upload, so its bytes are now unreachable.
+    if (existing.fileKey) await removeQuietly(existing.fileKey);
+  }
   return { id: resourceId };
 }
 
 export async function removeResource(userId: string, resourceId: string) {
-  if (!(await findTeacherResource(userId, resourceId))) throw notFound();
+  const existing = await findTeacherResource(userId, resourceId);
+  if (!existing) throw notFound();
+  // Row first: if the process dies in between, the worst case is an orphan file,
+  // never a resource that points at nothing.
   await deleteResource(resourceId);
+  if (existing.fileKey) await removeQuietly(existing.fileKey);
   return { deleted: true };
+}
+
+// ---- uploaded files ---------------------------------------------------------
+
+// The check and the write are separate statements, so two uploads racing each other can
+// overshoot by a file or two: the cap stops runaway disk use, it is not an exact quota.
+async function assertRoomFor(userId: string, incoming: number, replacing = 0) {
+  const used = await storedBytesOf(userId);
+  if (used - replacing + incoming > USER_PDF_BYTES_LIMIT) {
+    throw new AuthoringServiceError(
+      409,
+      `Penyimpanan file akunmu penuh (maksimal ${formatBytes(USER_PDF_BYTES_LIMIT)}). Hapus file yang tidak terpakai, lalu coba lagi.`,
+      "LIMIT_REACHED",
+    );
+  }
+}
+
+async function storeUpload(upload: ResourceUpload): Promise<StoredFile> {
+  const key = newResourceKey();
+  await fileStorage.save(key, upload.file.bytes);
+  return { key, name: upload.file.name, size: upload.file.bytes.length };
+}
+
+export async function addResourceFile(userId: string, lessonId: string, upload: ResourceUpload) {
+  if (!(await findTeacherLesson(userId, lessonId))) throw notFound();
+  await assertRoomFor(userId, upload.file.bytes.length);
+  const file = await storeUpload(upload);
+  try {
+    return await createFileResource(lessonId, {
+      title: upload.title,
+      content: upload.content,
+      file,
+    });
+  } catch (error) {
+    await removeQuietly(file.key);
+    throw error;
+  }
+}
+
+export async function replaceResourceUpload(
+  userId: string,
+  resourceId: string,
+  upload: ResourceUpload,
+) {
+  const existing = await findTeacherResource(userId, resourceId);
+  if (!existing) throw notFound();
+  await assertRoomFor(userId, upload.file.bytes.length, existing.fileSize ?? 0);
+  const file = await storeUpload(upload);
+  let matched = false;
+  try {
+    matched = await replaceResourceFile(resourceId, {
+      title: upload.title,
+      content: upload.content,
+      file,
+    });
+  } catch (error) {
+    await removeQuietly(file.key);
+    throw error;
+  }
+  if (!matched) {
+    await removeQuietly(file.key);
+    throw notFound();
+  }
+  if (existing.fileKey) await removeQuietly(existing.fileKey);
+  return { id: resourceId };
+}
+
+export async function getMyResourceFile(userId: string, resourceId: string) {
+  const existing = await findTeacherResource(userId, resourceId);
+  if (!existing?.fileKey || !existing.fileName || !existing.fileSize) throw notFound();
+  return { key: existing.fileKey, name: existing.fileName, size: existing.fileSize };
 }
 
 export async function orderResources(userId: string, lessonId: string, ids: string[]) {

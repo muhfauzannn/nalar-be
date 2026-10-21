@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { fileResponse } from "../../lib/file-response";
 import { requireSession, type StudentVariables } from "./student.auth";
 import { workflowStages, type WorkflowStage } from "./student.repository";
 import {
@@ -10,6 +11,7 @@ import {
   getStudentDashboard,
   getStudentLesson,
   getStudentQuiz,
+  getStudentResourceFile,
   getStudentShell,
   listStudentCourses,
   regenerateQuizReflection,
@@ -52,6 +54,16 @@ studentRoutes.get("/lessons/:lessonId", async (context) =>
     await getStudentLesson(
       context.get("session").user.id,
       requiredId(context.req.param("lessonId")),
+    ),
+  ),
+);
+
+studentRoutes.get("/resources/:resourceId/file", async (context) =>
+  fileResponse(
+    context,
+    await getStudentResourceFile(
+      context.get("session").user.id,
+      requiredId(context.req.param("resourceId")),
     ),
   ),
 );

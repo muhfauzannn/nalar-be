@@ -143,3 +143,58 @@ export function expectNoKeys(value: unknown, forbidden: string[], path = "$"): s
   }
   return found;
 }
+
+// ---- uploads ----------------------------------------------------------------
+
+// Smallest thing that starts like a PDF. `filler` makes files differ from each other.
+export function makePdf(filler = "", padTo = 0) {
+  const head = new TextEncoder().encode(`%PDF-1.4\n1 0 obj<<>>endobj\n${filler}\n%%EOF\n`);
+  const bytes = new Uint8Array(Math.max(padTo, head.length));
+  bytes.fill(0x20);
+  bytes.set(head);
+  return bytes;
+}
+
+// Sends a multipart body the way a browser does: an explicit Content-Length, so the
+// size limit is exercised on the declared length too.
+export async function multipart(
+  client: Client | null,
+  method: "POST" | "PUT",
+  path: string,
+  fields: Record<string, string | { name: string; type?: string; bytes: Uint8Array } | undefined>,
+) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    if (typeof value === "string") form.set(key, value);
+    else form.set(key, new File([new Uint8Array(value.bytes)], value.name, { type: value.type ?? "application/pdf" }));
+  }
+  // The blob carries the boundary in its type; a bare Response does not expose it.
+  const encoded = await new Response(form).blob();
+  const body = await encoded.arrayBuffer();
+  const res = await app.request(path, {
+    method,
+    headers: {
+      "content-type": encoded.type,
+      "content-length": String(body.byteLength),
+      origin: ORIGIN,
+      ...(client ? { cookie: client.cookie } : {}),
+    },
+    body,
+  });
+  const text = await res.text();
+  let parsed: unknown = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = { raw: text };
+  }
+  return { status: res.status, body: parsed as any, headers: res.headers };
+}
+
+// A download: the raw response, so bytes and headers can be compared.
+export function download(client: Client | null, path: string) {
+  return app.request(path, {
+    headers: { origin: ORIGIN, ...(client ? { cookie: client.cookie } : {}) },
+  });
+}

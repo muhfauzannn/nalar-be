@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 const DEFAULT_PORT = 8000;
 
 function required(source: NodeJS.ProcessEnv, name: string): string {
@@ -75,7 +77,63 @@ function port(source: NodeJS.ProcessEnv): number {
   return parsed;
 }
 
-function loadEnv(source: NodeJS.ProcessEnv = process.env) {
+// Where uploaded files live. "s3" is any S3-compatible store (Cloudflare R2 in
+// production). A half-filled s3 setup must not take the whole API down, so it is
+// reported as "unconfigured": the app boots, uploads/downloads answer 503, and the
+// problems are logged at start-up.
+export type StorageConfig =
+  | { driver: "disk"; uploadDir: string }
+  | {
+      driver: "s3";
+      endpoint: string;
+      bucket: string;
+      accessKeyId: string;
+      secretAccessKey: string;
+      region: string;
+    }
+  | { driver: "unconfigured"; problems: string[] };
+
+function storage(source: NodeJS.ProcessEnv): StorageConfig {
+  const driver = optional(source, "STORAGE_DRIVER") ?? "disk";
+
+  if (driver === "disk") {
+    return { driver, uploadDir: resolve(optional(source, "UPLOAD_DIR") ?? "uploads") };
+  }
+  if (driver !== "s3") {
+    throw new Error('Environment variable STORAGE_DRIVER must be "disk" or "s3"');
+  }
+
+  const problems: string[] = [];
+  const need = (name: string) => {
+    const value = optional(source, name);
+    if (!value) problems.push(`${name} belum diisi`);
+    return value ?? "";
+  };
+  const endpoint = need("S3_ENDPOINT");
+  const bucket = need("S3_BUCKET");
+  const accessKeyId = need("S3_ACCESS_KEY_ID");
+  const secretAccessKey = need("S3_SECRET_ACCESS_KEY");
+  if (endpoint) {
+    try {
+      new URL(endpoint);
+    } catch {
+      problems.push("S3_ENDPOINT bukan URL yang valid");
+    }
+  }
+  if (problems.length > 0) return { driver: "unconfigured", problems };
+
+  return {
+    driver: "s3",
+    endpoint,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    // Cloudflare R2 ignores the region but the signature needs one; "auto" is what it documents.
+    region: optional(source, "S3_REGION") ?? "auto",
+  };
+}
+
+export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
   const betterAuthSecret = required(source, "BETTER_AUTH_SECRET");
 
   if (betterAuthSecret.length < 32) {
@@ -100,6 +158,7 @@ function loadEnv(source: NodeJS.ProcessEnv = process.env) {
     googleClientId: required(source, "GOOGLE_CLIENT_ID"),
     googleClientSecret: required(source, "GOOGLE_CLIENT_SECRET"),
     port: port(source),
+    storage: storage(source),
     trustedOrigins,
   } as const;
 }

@@ -12,7 +12,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:reset": "bun run src/database/reset.ts",
     "db:seed": "bun run src/database/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "storage:check": "bun run src/scripts/storage-check.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.6.23",

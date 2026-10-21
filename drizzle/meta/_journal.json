@@ -43,6 +43,13 @@
       "when": 1792595392283,
       "tag": "0005_school_removal",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792605530999,
+      "tag": "0006_resource_files",
+      "breakpoints": true
     }
   ]
 }

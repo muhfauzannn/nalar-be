@@ -1,3 +1,4 @@
+import { displayFileName, formatBytes, looksLikePdf, MAX_PDF_BYTES } from "../../lib/pdf-upload";
 import { normalizeShortAnswer } from "../../lib/quiz-readiness";
 import type { CriterionInput } from "./assignment.repository";
 import type { NewAssignmentInput } from "./assignment.service";
@@ -15,7 +16,12 @@ import {
   uuidList,
 } from "./authoring.shared";
 import type { ResourceInput } from "./course.repository";
-import type { PublicationStatus, CourseStatus } from "./course.service";
+import type {
+  PublicationStatus,
+  CourseStatus,
+  ResourceEdit,
+  ResourceUpload,
+} from "./course.service";
 import type { QuestionInput, QuizStatus } from "./quiz.repository";
 import type { QuizInput } from "./quiz.service";
 
@@ -107,6 +113,36 @@ export function parseResource(body: Record<string, unknown>): ResourceInput {
     content: optionalText(body.content, "Deskripsi resource", 1000),
     url: httpUrl(body.url, "URL resource"),
   };
+}
+
+// An uploaded resource has no URL, so an edit that sends none (and says "file") only
+// changes its words; anything else rewrites the resource like a create would.
+export function parseResourceEdit(body: Record<string, unknown>): ResourceEdit {
+  if (body.type === "file" && !has(body, "url")) {
+    return {
+      kind: "details",
+      title: text(body.title, "Judul resource", { max: 160 }),
+      content: optionalText(body.content, "Deskripsi resource", 1000),
+    };
+  }
+  return { kind: "replace", ...parseResource(body) };
+}
+
+export async function parseResourceUpload(form: FormData): Promise<ResourceUpload> {
+  const title = text(form.get("title"), "Judul resource", { max: 160 });
+  const content = optionalText(form.get("content"), "Deskripsi resource", 1000);
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new AuthoringRequestError("Pilih file PDF yang akan diunggah.");
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    throw new AuthoringRequestError(`File terlalu besar (maksimal ${formatBytes(MAX_PDF_BYTES)}).`);
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!looksLikePdf(bytes)) {
+    throw new AuthoringRequestError("File harus berupa PDF yang valid.");
+  }
+  return { title, content, file: { name: displayFileName(file.name, title), bytes } };
 }
 
 export function parseOrder(body: Record<string, unknown>) {

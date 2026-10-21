@@ -9,5 +9,6 @@ node_modules/
 # generated/runtime
 dist/
 *.log
+uploads/
 
 /AGENTS.md

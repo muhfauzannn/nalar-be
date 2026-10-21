@@ -140,6 +140,14 @@ export function boundedNumber(
   return value;
 }
 
+export async function readForm(request: Request): Promise<FormData> {
+  try {
+    return await request.formData();
+  } catch {
+    throw new AuthoringRequestError("Form unggahan tidak valid.");
+  }
+}
+
 export function optionalDate(value: unknown, label: string): Date | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string") {

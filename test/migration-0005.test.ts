@@ -161,7 +161,8 @@ describe("migration 0005 (school removal) on a database that already holds data"
     const leftovers = await client`select table_name from information_schema.tables where table_schema = 'public' and table_name like 'school%'`;
     expect(leftovers).toHaveLength(0);
     const { applied } = (await client`select count(*)::int as applied from drizzle.__drizzle_migrations`)[0]!;
-    expect(applied).toBe(6);
+    // every migration in the journal, whatever comes after 0005
+    expect(applied).toBe(JSON.parse(readFileSync("./drizzle/meta/_journal.json", "utf8")).entries.length);
 
     // a course can now exist without a term
     const [orphanTerm] = await client`insert into course (subject_id, name) values (${f.subject}, 'Tanpa semester') returning term_id`;

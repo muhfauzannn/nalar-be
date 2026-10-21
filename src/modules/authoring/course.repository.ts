@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "../../database/client";
+import { publicResource } from "../../lib/pdf-upload";
 import {
   assignment,
   course,
@@ -105,6 +106,9 @@ export async function findTeacherResource(userId: string, resourceId: string) {
       title: learningResource.title,
       content: learningResource.content,
       url: learningResource.url,
+      fileKey: learningResource.fileKey,
+      fileName: learningResource.fileName,
+      fileSize: learningResource.fileSize,
     })
     .from(learningResource)
     .innerJoin(lesson, eq(lesson.id, learningResource.lessonId))
@@ -309,19 +313,23 @@ export async function getCourseEditor(courseId: string) {
 
   const lessonIds = lessons.map((row) => row.id);
   const resources = lessonIds.length
-    ? await db
-        .select({
-          id: learningResource.id,
-          lessonId: learningResource.lessonId,
-          type: learningResource.type,
-          title: learningResource.title,
-          content: learningResource.content,
-          url: learningResource.url,
-          position: learningResource.position,
-        })
-        .from(learningResource)
-        .where(inArray(learningResource.lessonId, lessonIds))
-        .orderBy(asc(learningResource.position))
+    ? (
+        await db
+          .select({
+            id: learningResource.id,
+            lessonId: learningResource.lessonId,
+            type: learningResource.type,
+            title: learningResource.title,
+            content: learningResource.content,
+            url: learningResource.url,
+            fileName: learningResource.fileName,
+            fileSize: learningResource.fileSize,
+            position: learningResource.position,
+          })
+          .from(learningResource)
+          .where(inArray(learningResource.lessonId, lessonIds))
+          .orderBy(asc(learningResource.position))
+      ).map(publicResource)
     : [];
 
   const [quizzes, assignments, studentRows] = await Promise.all([
@@ -507,21 +515,85 @@ export type ResourceInput = {
   url: string | null;
 };
 
-export async function createResource(lessonId: string, input: ResourceInput) {
+export type StoredFile = { key: string; name: string; size: number };
+export type FileResourceInput = { title: string; content: string | null; file: StoredFile };
+
+const NO_FILE = { fileKey: null, fileName: null, fileSize: null } as const;
+const fileColumns = (file: StoredFile) => ({
+  fileKey: file.key,
+  fileName: file.name,
+  fileSize: file.size,
+});
+
+async function insertResource(lessonId: string, values: Omit<typeof learningResource.$inferInsert, "lessonId" | "position">) {
   return db.transaction(async (tx) => {
     await tx.select({ id: lesson.id }).from(lesson).where(eq(lesson.id, lessonId)).for("update");
     await assertBelowLimit(tx, "learning_resource", lessonId, RESOURCE_LIMIT, "Jumlah resource");
     const position = await nextPosition(tx, "learning_resource", lessonId);
     const [created] = await tx
       .insert(learningResource)
-      .values({ lessonId, position, ...input })
+      .values({ lessonId, position, ...values })
       .returning({ id: learningResource.id });
     return created;
   });
 }
 
+export async function createResource(lessonId: string, input: ResourceInput) {
+  return insertResource(lessonId, input);
+}
+
+export async function createFileResource(lessonId: string, input: FileResourceInput) {
+  return insertResource(lessonId, {
+    type: "file",
+    title: input.title,
+    content: input.content,
+    url: null,
+    ...fileColumns(input.file),
+  });
+}
+
+// A text/link/URL-file edit. Switching an uploaded resource to one of these leaves it
+// without a file, so the columns are cleared here and the caller removes the bytes.
 export async function updateResource(resourceId: string, input: ResourceInput) {
+  await db
+    .update(learningResource)
+    .set({ ...input, ...NO_FILE })
+    .where(eq(learningResource.id, resourceId));
+}
+
+// Only the words around an uploaded file changed.
+export async function updateResourceText(
+  resourceId: string,
+  input: { title: string; content: string | null },
+) {
   await db.update(learningResource).set(input).where(eq(learningResource.id, resourceId));
+}
+
+// Also used to turn an old URL-only 'file' resource into an upload.
+export async function replaceResourceFile(resourceId: string, input: FileResourceInput) {
+  const updated = await db
+    .update(learningResource)
+    .set({
+      type: "file",
+      title: input.title,
+      content: input.content,
+      url: null,
+      ...fileColumns(input.file),
+    })
+    .where(eq(learningResource.id, resourceId))
+    .returning({ id: learningResource.id });
+  return updated.length > 0;
+}
+
+// Bytes already stored by an account, counted over the courses they teach.
+export async function storedBytesOf(userId: string) {
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${learningResource.fileSize}), 0)::float8` })
+    .from(learningResource)
+    .innerJoin(lesson, eq(lesson.id, learningResource.lessonId))
+    .innerJoin(learningModule, eq(learningModule.id, lesson.moduleId))
+    .innerJoin(courseMembership, teacherOf(learningModule.courseId, userId));
+  return row?.total ?? 0;
 }
 
 // Nothing references a resource, so (unlike lessons and modules, which carry
@@ -556,18 +628,22 @@ export async function getLessonEditor(lessonId: string) {
     .limit(1);
   if (!row) return null;
 
-  const resources = await db
-    .select({
-      id: learningResource.id,
-      type: learningResource.type,
-      title: learningResource.title,
-      content: learningResource.content,
-      url: learningResource.url,
-      position: learningResource.position,
-    })
-    .from(learningResource)
-    .where(eq(learningResource.lessonId, lessonId))
-    .orderBy(asc(learningResource.position));
+  const resources = (
+    await db
+      .select({
+        id: learningResource.id,
+        type: learningResource.type,
+        title: learningResource.title,
+        content: learningResource.content,
+        url: learningResource.url,
+        fileName: learningResource.fileName,
+        fileSize: learningResource.fileSize,
+        position: learningResource.position,
+      })
+      .from(learningResource)
+      .where(eq(learningResource.lessonId, lessonId))
+      .orderBy(asc(learningResource.position))
+  ).map(publicResource);
 
   return { lesson: row, resources };
 }

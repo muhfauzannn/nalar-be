@@ -6,5 +6,6 @@ node_modules
 !.env.example
 dist
 *.log
+uploads
 AGENTS.md
 README.md

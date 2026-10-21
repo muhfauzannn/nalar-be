@@ -2,6 +2,9 @@
 // real migrations to it, and points the app at it. Tests therefore exercise the
 // same SQL, constraints and indexes production does - nothing is mocked.
 import { afterAll } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -35,11 +38,34 @@ process.env.GOOGLE_CLIENT_ID ??= "test-google-client-id";
 process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
 delete process.env.GEMINI_API_KEY; // AI paths must degrade gracefully, never call out
 
+// Uploaded files go to a throw-away directory, never to ./uploads, unless the run is
+// pointed at an S3-compatible server with TEST_S3_* (the same suite then proves the S3
+// driver). Tests may only write their own generated keys, but never aim them at a real
+// store: R2 and AWS hosts are refused, like hosted Postgres above.
+const uploadDir = await mkdtemp(join(tmpdir(), "nalar-uploads-"));
+process.env.UPLOAD_DIR = uploadDir;
+for (const name of ["STORAGE_DRIVER", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_REGION"]) {
+  delete process.env[name];
+}
+const testS3 = process.env.TEST_S3_ENDPOINT?.trim();
+if (testS3) {
+  const host = new URL(testS3).hostname;
+  if (host.endsWith("r2.cloudflarestorage.com") || host.endsWith("amazonaws.com")) {
+    throw new Error(`Menolak menjalankan test terhadap penyimpanan remote: ${host}`);
+  }
+  process.env.STORAGE_DRIVER = "s3";
+  process.env.S3_ENDPOINT = testS3;
+  process.env.S3_BUCKET = process.env.TEST_S3_BUCKET ?? "nalar-test";
+  process.env.S3_ACCESS_KEY_ID = process.env.TEST_S3_ACCESS_KEY_ID ?? "";
+  process.env.S3_SECRET_ACCESS_KEY = process.env.TEST_S3_SECRET_ACCESS_KEY ?? "";
+}
+
 const migrationClient = postgres(process.env.DATABASE_URL, { max: 1, onnotice: () => {} });
 await migrate(drizzle(migrationClient), { migrationsFolder: "./drizzle" });
 await migrationClient.end();
 
 afterAll(async () => {
+  await rm(uploadDir, { recursive: true, force: true });
   await adminClient.unsafe(`drop database if exists ${databaseName} with (force)`);
   await adminClient.end();
 });
