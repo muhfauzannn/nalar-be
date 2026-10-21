@@ -19,6 +19,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runtime
+      args:
+        VITE_API_URL: https://api.nalar.muhfauzan.dev
+        VITE_APP_URL: https://nalar.muhfauzan.dev
     env_file:
       - ../persistent/fe.env
     ports:
