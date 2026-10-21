@@ -123,7 +123,9 @@ describe("migration 0005 (school removal) on a database that already holds data"
 
     // the same-role-twice rule is enforced for the new key
     await expect(
-      client`insert into course_membership (course_id, user_id, role) values (${f.course1}, ${f.student}, 'student')`,
+      (async () => {
+        await client`insert into course_membership (course_id, user_id, role) values (${f.course1}, ${f.student}, 'student')`;
+      })(),
     ).rejects.toThrow();
 
     await client.end();
@@ -153,25 +155,24 @@ describe("migration 0005 (school removal) on a database that already holds data"
     ]);
     const [subject] = await client`select code, name from subject where id = ${f.subject}`;
     expect(subject).toEqual({ code: "MAT-X", name: "Matematika Khusus" });
-    const [{ total }] = await client`select count(*)::int as total from subject`;
+    const { total } = (await client`select count(*)::int as total from subject`)[0]!;
     expect(total).toBe(17); // 1 existing + 16 reference subjects
 
     const leftovers = await client`select table_name from information_schema.tables where table_schema = 'public' and table_name like 'school%'`;
     expect(leftovers).toHaveLength(0);
-    const [{ applied }] = await client`select count(*)::int as applied from drizzle.__drizzle_migrations`;
+    const { applied } = (await client`select count(*)::int as applied from drizzle.__drizzle_migrations`)[0]!;
     expect(applied).toBe(6);
 
     // a course can now exist without a term
-    await expect(
-      client`insert into course (subject_id, name) values (${f.subject}, 'Tanpa semester')`,
-    ).resolves.toBeDefined();
+    const [orphanTerm] = await client`insert into course (subject_id, name) values (${f.subject}, 'Tanpa semester') returning term_id`;
+    expect(orphanTerm!.term_id).toBeNull();
     await client.end();
   });
 
   test("an empty database (a fresh install) migrates too", async () => {
     const { client } = await databaseAtVersion4();
     await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
-    const [{ total }] = await client`select count(*)::int as total from subject`;
+    const { total } = (await client`select count(*)::int as total from subject`)[0]!;
     expect(total).toBe(16);
     await client.end();
   });
@@ -193,11 +194,11 @@ describe("migration 0005 (school removal) on a database that already holds data"
     const names = columns.map((row) => row.column_name);
     expect(names).toContain("school_membership_id");
     expect(names).not.toContain("user_id");
-    const [{ applied }] = await client`select count(*)::int as applied from drizzle.__drizzle_migrations`;
+    const { applied } = (await client`select count(*)::int as applied from drizzle.__drizzle_migrations`)[0]!;
     expect(applied).toBe(5);
-    const [{ memberships }] = await client`select count(*)::int as memberships from course_membership`;
+    const { memberships } = (await client`select count(*)::int as memberships from course_membership`)[0]!;
     expect(memberships).toBe(3);
-    const [{ subjects }] = await client`select count(*)::int as subjects from subject`;
+    const { subjects } = (await client`select count(*)::int as subjects from subject`)[0]!;
     expect(subjects).toBe(1); // the reference-subject INSERT was rolled back too
 
     await client.end();
