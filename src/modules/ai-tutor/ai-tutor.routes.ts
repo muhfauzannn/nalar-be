@@ -8,10 +8,20 @@ import {
   saveAiTutorReply,
 } from "./ai-tutor.service";
 import type { TutorMode } from "./ai-tutor.repository";
+import { createPdfTutorSession } from "./pdf-tutor.service";
 
 export const aiTutorRoutes = new Hono<{ Variables: AuthVariables }>();
 
 aiTutorRoutes.use("*", requireSession);
+
+aiTutorRoutes.post("/pdf-sessions", async (context) => {
+  const body = await readObject(context.req.raw);
+  context.header("Cache-Control", "no-store");
+  return context.json(await createPdfTutorSession(
+    context.get("session").user.id,
+    requiredId(body.resourceId, "ID PDF"),
+  ), 201);
+});
 
 aiTutorRoutes.post("/sessions", async (context) => {
   const body = await readObject(context.req.raw);

@@ -137,3 +137,17 @@ TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_BUCKET=nalar-test \
 ```
 
 (R2 and AWS hosts are refused as `TEST_S3_ENDPOINT`, like hosted Postgres for the database.)
+
+## Tutor suara PDF
+
+`POST /api/student/ai-tutor/pdf-sessions` dengan `{ resourceId }` membuat token
+Gemini Live sekali pakai untuk pembelajaran PDF. Akses mengikuti aturan file siswa
+(membership dan status publikasi materi); sesi berbagi rate limiter tutor yang ada.
+Konfigurasi memakai `GEMINI_API_KEY` yang sama. Tidak memerlukan migrasi database.
+Percakapan PDF bersifat sementara di frontend; tutor tugas/kuis tetap memakai
+penyimpanan percakapannya yang ada.
+
+`bun run tutor:smoke` memeriksa token, koneksi Live, pembacaan konteks, tindakan visual,
+dan audio menggunakan materi sintetis. Ini memanggil provider berbayar. Opsional:
+`PDF_TUTOR_SMOKE_IMAGE=/path/to/fixture.jpg bun run tutor:smoke` untuk input visual.
+Kredensial tidak dicetak. Uji akses endpoint ada di `test/pdf-tutor.test.ts`.
