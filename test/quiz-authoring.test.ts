@@ -363,10 +363,10 @@ describe("teacher edit versus student start (row-lock serialisation)", () => {
     release();
     await editTx;
     expect((await start).status).toBe(201);
-    const [{ total }] = (await db.execute(
+    const counted = (await db.execute(
       sql`select count(*)::int as total from quiz_attempt where quiz_id = ${quizId}`,
     )) as unknown as Array<{ total: number }>;
-    expect(total).toBe(1);
+    expect(counted[0]?.total).toBe(1);
   });
 });
 
