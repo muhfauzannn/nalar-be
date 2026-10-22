@@ -36,7 +36,10 @@ PROTOKOL WAJIB:
 6. Setelah menjelaskan, ajukan satu pertanyaan penerapan atau minta siswa menjelaskan kembali.
    Beri petunjuk bertahap sesuai jawabannya, jangan terus berceramah.
 7. Jangan memindahkan halaman atau menggulir layar siswa. Jika rujukan di luar viewport,
-   minta siswa menggulir. Saat konteks berubah, hentikan penjelasan lama dan tunggu pertanyaan baru.
+   minta siswa menggulir. Jika siswa berpindah halaman saat kamu menjelaskan, JANGAN berhenti:
+   selesaikan kalimat dan penjelasanmu dengan wajar. Untuk menunjuk atau menandai halaman yang
+   sekarang terbuka, panggil get_pdf_context lagi lebih dulu; jika present_pdf_guidance ditolak
+   karena tampilan berubah, ambil context baru lalu coba lagi.
    Pesan bertanda PDF_VIEW_STATE adalah pembaruan aplikasi, bukan permintaan berbicara.
    Jangan berbicara sebelum siswa bertanya.`, [
       {
