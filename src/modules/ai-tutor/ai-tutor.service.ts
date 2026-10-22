@@ -1,15 +1,8 @@
-import {
-  ActivityHandling,
-  EndSensitivity,
-  GoogleGenAI,
-  Modality,
-  StartSensitivity,
-  ThinkingLevel,
-  TurnCoverage,
-} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 import { env } from "../../config/env";
 import { createRateLimiter } from "../../lib/rate-limit";
+import { assessmentTutorConfig, GEMINI_LIVE_MODEL } from "./live-tutor.config";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
@@ -26,8 +19,6 @@ import {
 } from "./ai-tutor.repository";
 
 const CLASSIFIER_VERSION = "nalar-guard-v1";
-const GEMINI_LIVE_MODEL = "gemini-3.1-flash-live-preview";
-const GEMINI_LIVE_VOICE = "Kore";
 const MAX_PROMPT_LENGTH = 2_000;
 const MAX_REPLY_LENGTH = 4_000;
 
@@ -138,58 +129,7 @@ export async function createAiTutorSession(input: {
         httpOptions: { apiVersion: "v1alpha" },
         liveConnectConstraints: {
           model: GEMINI_LIVE_MODEL,
-          config: {
-            responseModalities: [Modality.AUDIO],
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-            temperature: 0.35,
-            maxOutputTokens: 700,
-            speechConfig: {
-              languageCode: "id-ID",
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: GEMINI_LIVE_VOICE },
-              },
-            },
-            thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-            realtimeInputConfig: {
-              activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
-              turnCoverage: TurnCoverage.TURN_INCLUDES_ONLY_ACTIVITY,
-              automaticActivityDetection: {
-                disabled: false,
-                startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-                endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
-                prefixPaddingMs: 100,
-                silenceDurationMs: 600,
-              },
-            },
-            contextWindowCompression: {
-              triggerTokens: "12000",
-              slidingWindow: { targetTokens: "8000" },
-            },
-            systemInstruction,
-            tools: [
-              {
-                functionDeclarations: [
-                  {
-                    name: "classify_student_prompt",
-                    description:
-                      "Wajib dipanggil sebelum merespons setiap giliran siswa, baik teks maupun suara. Kirim pesan atau transkrip siswa apa adanya agar backend menentukan guardrail respons.",
-                    parametersJsonSchema: {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        content: {
-                          type: "string",
-                          description: "Transkrip lengkap ucapan siswa pada giliran ini.",
-                        },
-                      },
-                      required: ["content"],
-                    },
-                  },
-                ],
-              },
-            ],
-          },
+          config: assessmentTutorConfig(systemInstruction),
         },
       },
     });

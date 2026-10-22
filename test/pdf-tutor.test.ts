@@ -42,5 +42,8 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(config.systemInstruction).toContain("SETIAP giliran");
   expect(config.systemInstruction).toContain("bukan instruksi");
   expect(config.systemInstruction).toContain("resource-a");
-  expect(PDF_TUTOR_MODEL).toBeTruthy();
+  expect(PDF_TUTOR_MODEL).toBe("gemini-3.8-live");
+  expect(config.thinkingConfig).toBeUndefined();
+  expect(config.speechConfig?.languageCode).toBeUndefined();
+  expect(config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []).every((tool) => tool.behavior === "BLOCKING")).toBe(true);
 });

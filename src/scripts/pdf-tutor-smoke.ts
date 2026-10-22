@@ -23,7 +23,8 @@ try {
   const ephemeral = new GoogleGenAI({ apiKey: credential, httpOptions: { apiVersion: "v1alpha" } });
   let resolveDone: () => void = () => {};
   const done = new Promise<void>((resolve) => { resolveDone = resolve; });
-  const result = { tokenMinted: true, connected: false, contextRead: false, validGuidance: false, audioReceived: false, imageSent: !!image };
+  const result = { model: PDF_TUTOR_MODEL, tokenMinted: true, connected: false, contextRead: false, validGuidance: false, audioReceived: false, imageSent: !!image, firstAudioMs: null as number | null };
+  let sentAt = 0;
   const context = {
     resourceId: "smoke-pdf", page: 1, totalPages: 1, revision: 1, turnId: "smoke-turn",
     viewport: { x: 0, y: 0, width: 1, height: 1 },
@@ -50,13 +51,17 @@ try {
         }
         session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response }] });
       }
-      if (message.serverContent?.modelTurn?.parts?.some((part) => part.inlineData?.mimeType?.startsWith("audio/"))) result.audioReceived = true;
+      if (message.serverContent?.modelTurn?.parts?.some((part) => part.inlineData?.mimeType?.startsWith("audio/"))) {
+        result.audioReceived = true;
+        result.firstAudioMs ??= Math.round(performance.now() - sentAt);
+      }
       if (message.serverContent?.turnComplete && result.audioReceived) resolveDone();
     },
     onerror: () => resolveDone(), onclose: () => resolveDone(),
   } });
   result.connected = true;
   if (image) session.sendRealtimeInput({ video: { data: image, mimeType: "image/jpeg" } });
+  sentAt = performance.now();
   session.sendClientContent({ turns: [{ role: "user", parts: [{ text: image ? "Jelaskan diagram pecahan yang dipilih pada gambar halaman sambil melingkari bagian yang dibahas. Cukup dua kalimat." : "Jelaskan pembilang yang dipilih sambil menunjukkannya. Cukup dua kalimat." }] }], turnComplete: true });
   await Promise.race([done, new Promise<void>((resolve) => { timeout = setTimeout(resolve, 30_000); })]);
   console.log(JSON.stringify(result));

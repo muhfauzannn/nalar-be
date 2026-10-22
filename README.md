@@ -146,6 +146,12 @@ TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_BUCKET=nalar-test \
 
 ## Tutor suara PDF
 
+Tutor PDF, quiz, dan assignment memakai `gemini-3.8-live` (konfigurasi bersama di
+`live-tutor.config.ts`). Sesi tidak mengirim `thinkingConfig` atau `languageCode`;
+bahasa Indonesia ditentukan oleh instruksi tutor. Tool klasifikasi dan panduan PDF
+memakai `BLOCKING` agar tutor menunggu hasil sebelum menjawab. Deteksi akhir ucapan
+menunggu 500 ms tanpa suara.
+
 `POST /api/student/ai-tutor/pdf-sessions` dengan `{ resourceId }` membuat token
 Gemini Live sekali pakai untuk pembelajaran PDF. Akses mengikuti aturan file siswa
 (membership dan status publikasi materi); sesi berbagi rate limiter tutor yang ada.
