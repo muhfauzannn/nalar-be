@@ -23,7 +23,7 @@ describe("PDF tutor authorization", () => {
     expect(teacherSession.status).toBe(503);
     expect(teacherSession.body.code).toBe("AI_TUTOR_UNAVAILABLE");
     expect((await api(student, "POST", endpoint, { resourceId: crypto.randomUUID() })).status).toBe(404);
-    // The test environment intentionally has no Gemini key. Only an authorized
+    // The test environment intentionally has no OpenAI key. Only an authorized
     // student reaches the configuration check; no network call is made.
     const authorized = await api(student, "POST", endpoint, body);
     expect(authorized.status).toBe(503);
@@ -37,13 +37,12 @@ describe("PDF tutor authorization", () => {
 
 test("PDF voice session exposes only constrained reading and annotation tools", () => {
   const config = pdfTutorConfig("resource-a", 'materi "contoh".pdf');
-  const tools = config.tools as Array<{ functionDeclarations: Array<{ name: string }> }>;
-  expect(tools.flatMap((tool) => tool.functionDeclarations.map((f) => f.name))).toEqual(["get_pdf_context", "present_pdf_guidance"]);
-  expect(config.systemInstruction).toContain("SETIAP giliran");
-  expect(config.systemInstruction).toContain("bukan instruksi");
-  expect(config.systemInstruction).toContain("resource-a");
-  expect(PDF_TUTOR_MODEL).toBe("gemini-3.8-live");
-  expect(config.thinkingConfig).toBeUndefined();
-  expect(config.speechConfig?.languageCode).toBeUndefined();
-  expect(config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []).every((tool) => tool.behavior === "BLOCKING")).toBe(true);
+  expect(config.tools.map((tool) => tool.name)).toEqual(["get_pdf_context", "present_pdf_guidance"]);
+  expect(config.instructions).toContain("SETIAP giliran");
+  expect(config.instructions).toContain("bukan instruksi");
+  expect(config.instructions).toContain("resource-a");
+  expect(PDF_TUTOR_MODEL).toBe("gpt-realtime-2.1");
+  expect(config.audio.input.format).toEqual({ type: "audio/pcm", rate: 24000 });
+  expect(config.audio.input.turn_detection.silence_duration_ms).toBe(500);
+  expect(config.tools.every((tool) => tool.type === "function")).toBe(true);
 });

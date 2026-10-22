@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { openaiRequest } from "../../lib/openai";
 
 import { env } from "../../config/env";
 import {
@@ -19,10 +19,8 @@ import {
 } from "./ai-analysis.repository";
 
 const SCORING_VERSION = "nalar-offload-v1";
-// `generateContent` model for offline analysis (offloading index + quiz reflection).
-// Must be a servable model id — `gemini-3.1-flash` (only `-lite` shipped) 404s and
-// silently yields null reports. `gemini-2.5-flash` is GA and supports structured output.
-const GEMINI_ANALYSIS_MODEL = "gemini-2.5-flash";
+// Structured analysis uses a smaller text model than the voice tutor.
+const ANALYSIS_MODEL = "gpt-4.1-mini";
 const MAX_ARTIFACT_CHARS = 4_000;
 const MAX_TUTOR_TURNS = 40;
 const OFFLOADING_LEVELS: OffloadingLevel[] = [
@@ -82,7 +80,7 @@ export async function generateSubmissionOffloading(
   try {
     const existing = await getSubmissionOffloadingRow(submissionId);
     if (existing) return toOffloadingView(existing.result, existing.factors);
-    if (!env.geminiApiKey) return null;
+    if (!env.openaiApiKey) return null;
 
     const context = await findSubmissionAnalysisContext(submissionId);
     if (!context) return null;
@@ -141,7 +139,7 @@ export async function generateQuizReflection(
       return saved ? toQuizReflectionView(saved) : null;
     }
 
-    if (!env.geminiApiKey) return null;
+    if (!env.openaiApiKey) return null;
     const analysis = await runQuizReflectionAnalysis(context, counts);
     if (!analysis) return null;
 
@@ -212,7 +210,7 @@ async function runOffloadingAnalysis(
     "Balas hanya sesuai skema JSON yang diminta.",
   ].join("\n");
 
-  const parsed = await callGemini(prompt, systemInstruction, offloadingSchema());
+  const parsed = await callOpenAI(prompt, systemInstruction, offloadingSchema());
   if (!parsed) return null;
 
   const level = normalizeLevel(parsed.level, parsed.score);
@@ -270,7 +268,7 @@ async function runQuizReflectionAnalysis(
     "Balas hanya sesuai skema JSON yang diminta.",
   ].join("\n");
 
-  const parsed = await callGemini(prompt, systemInstruction, quizReflectionSchema());
+  const parsed = await callOpenAI(prompt, systemInstruction, quizReflectionSchema());
   if (!parsed) return null;
 
   const relianceLevel = normalizeReliance(parsed.relianceLevel);
@@ -281,29 +279,25 @@ async function runQuizReflectionAnalysis(
   return { relianceLevel, studentReport: report.slice(0, 1_200), recommendations };
 }
 
-async function callGemini(
+async function callOpenAI(
   prompt: string,
   systemInstruction: string,
   responseSchema: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
-  const client = new GoogleGenAI({ apiKey: env.geminiApiKey });
-  const response = await client.models.generateContent({
-    model: GEMINI_ANALYSIS_MODEL,
-    contents: prompt,
-    config: {
-      systemInstruction,
-      temperature: 0.4,
-      maxOutputTokens: 1_200,
-      // Disable thinking: on Flash thinking models the reasoning tokens eat the
-      // output budget and truncate the JSON body, so JSON.parse fails and the
-      // report silently comes back null. This is structured extraction, not a
-      // task that needs a reasoning trace.
-      thinkingConfig: { thinkingBudget: 0 },
-      responseMimeType: "application/json",
-      responseSchema,
-    },
+  if (!env.openaiApiKey) return null;
+  const response = await openaiRequest<{
+    output: Array<{ content?: Array<{ type: string; text?: string }> }>;
+  }>(env.openaiApiKey, "responses", {
+    model: ANALYSIS_MODEL,
+    instructions: systemInstruction,
+    input: prompt,
+    temperature: 0.4,
+    max_output_tokens: 1800,
+    store: false,
+    text: { format: { type: "json_schema", name: "learning_analysis", strict: true, schema: strictSchema(responseSchema) } },
   });
-  const text = response.text?.trim();
+  const text = response.output.flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === "output_text").map((part) => part.text ?? "").join("").trim();
   if (!text) return null;
   try {
     const parsed = JSON.parse(text);
@@ -317,29 +311,29 @@ async function callGemini(
 
 function offloadingSchema() {
   return {
-    type: Type.OBJECT,
+    type: "object",
     properties: {
       level: {
-        type: Type.STRING,
+        type: "string",
         enum: OFFLOADING_LEVELS as unknown as string[],
       },
-      score: { type: Type.NUMBER },
-      intentInput: { type: Type.NUMBER },
-      effortInput: { type: Type.NUMBER },
-      studentReport: { type: Type.STRING },
+      score: { type: "number" },
+      intentInput: { type: "number" },
+      effortInput: { type: "number" },
+      studentReport: { type: "string" },
       factors: {
-        type: Type.ARRAY,
+        type: "array",
         items: {
-          type: Type.OBJECT,
+          type: "object",
           properties: {
-            factor: { type: Type.STRING },
-            contribution: { type: Type.NUMBER },
-            plainExplanation: { type: Type.STRING },
+            factor: { type: "string" },
+            contribution: { type: "number" },
+            plainExplanation: { type: "string" },
           },
           required: ["factor", "contribution", "plainExplanation"],
         },
       },
-      recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+      recommendations: { type: "array", items: { type: "string" } },
     },
     required: [
       "level",
@@ -355,14 +349,14 @@ function offloadingSchema() {
 
 function quizReflectionSchema() {
   return {
-    type: Type.OBJECT,
+    type: "object",
     properties: {
       relianceLevel: {
-        type: Type.STRING,
+        type: "string",
         enum: ["low", "moderate", "high"],
       },
-      studentReport: { type: Type.STRING },
-      recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+      studentReport: { type: "string" },
+      recommendations: { type: "array", items: { type: "string" } },
     },
     required: ["relianceLevel", "studentReport", "recommendations"],
   } satisfies Record<string, unknown>;
@@ -467,5 +461,16 @@ function toQuizReflectionView(row: QuizReflectionRow): QuizReflectionView {
     reflectiveCount: row.reflectiveCount,
     redirectedCount: row.redirectedCount,
     computedAt: row.computedAt.toISOString(),
+  };
+}
+
+/** OpenAI strict schemas require every object to disallow undeclared fields. */
+function strictSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...schema,
+    ...(schema.type === "object" ? { additionalProperties: false } : {}),
+    ...(schema.properties ? { properties: Object.fromEntries(Object.entries(schema.properties as Record<string, Record<string, unknown>>)
+      .map(([key, value]) => [key, strictSchema(value)])) } : {}),
+    ...(schema.items ? { items: strictSchema(schema.items as Record<string, unknown>) } : {}),
   };
 }

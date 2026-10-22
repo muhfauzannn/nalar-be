@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { mintTutorToken } from "./openai-session";
 import { env } from "../../config/env";
 import { getStudentResourceFile } from "../student/student.service";
 import { AiTutorServiceError, tutorSessionLimiter } from "./ai-tutor.service";
@@ -13,20 +13,12 @@ export async function createPdfTutorSession(userId: string, resourceId: string) 
   // Apply exactly the same enrollment/publication checks as downloading the PDF.
   // Never trust a client-supplied title, URL, or lesson context.
   const file = await getStudentResourceFile(userId, resourceId);
-  if (!env.geminiApiKey) {
+  if (!env.openaiApiKey) {
     throw new AiTutorServiceError(503, "AI Tutor belum dikonfigurasi pada server.", "AI_TUTOR_UNAVAILABLE");
   }
-  const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
   try {
-    const client = new GoogleGenAI({ apiKey: env.geminiApiKey });
-    const token = await client.authTokens.create({ config: {
-      uses: 1, expireTime: expiresAt,
-      newSessionExpireTime: new Date(Date.now() + 60_000).toISOString(),
-      httpOptions: { apiVersion: "v1alpha" },
-      liveConnectConstraints: { model: PDF_TUTOR_MODEL, config: pdfTutorConfig(resourceId, file.name) },
-    } });
-    if (!token.name) throw new Error("Empty live token");
-    return { token: token.name, model: PDF_TUTOR_MODEL, expiresAt, resourceId };
+    const credential = await mintTutorToken(env.openaiApiKey, pdfTutorConfig(resourceId, file.name), userId);
+    return { ...credential, model: PDF_TUTOR_MODEL, resourceId };
   } catch {
     throw new AiTutorServiceError(503, "Tutor suara belum dapat disambungkan. Silakan coba lagi.", "AI_TUTOR_SESSION_FAILED");
   }
