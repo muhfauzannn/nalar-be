@@ -122,10 +122,12 @@ export async function findTeacherResource(userId: string, resourceId: string) {
 // ---- reference data -----------------------------------------------------
 
 export async function listSubjects() {
-  return db
+  const rows = await db
     .select({ id: subject.id, code: subject.code, name: subject.name })
-    .from(subject)
-    .orderBy(asc(subject.name));
+    .from(subject);
+  // Database collation differs between local Postgres and Linux production/CI.
+  // Keep acronyms such as MIPA in Indonesian alphabetical order everywhere.
+  return rows.sort((a, b) => a.name.localeCompare(b.name, "id"));
 }
 
 export async function findSubject(subjectId: string) {

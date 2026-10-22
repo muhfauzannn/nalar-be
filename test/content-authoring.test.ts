@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { db } from "../src/database/client";
+import { subject } from "../src/database/schema";
 
 import {
   api,
@@ -67,12 +69,14 @@ describe("any registered user can create a course", () => {
   });
 
   test("the subject list is available to everyone signed in and is alphabetical", async () => {
+    await db.insert(subject).values({ code: "mipa-test-acronym", name: "MIPA Latihan" }).onConflictDoNothing();
     const user = await newUser("user");
     const reply = await api(user, "GET", "/api/manage/subjects");
     const names: string[] = reply.body.subjects.map((subject: { name: string }) => subject.name);
     expect(names).toContain("Matematika");
     expect(names).toContain("Bahasa Indonesia");
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, "id")));
+    expect(names.indexOf("Matematika")).toBeLessThan(names.indexOf("MIPA Latihan"));
   });
 });
 
