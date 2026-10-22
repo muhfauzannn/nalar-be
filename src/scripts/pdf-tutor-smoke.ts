@@ -27,7 +27,7 @@ try {
   credential = token.token;
   const result = { model: PDF_TUTOR_MODEL, mode: assessment ? "assessment" : "pdf", tokenMinted: true,
     connected: false, configurationRetained: false, contextRead: false, validGuidance: false,
-    classified: false, audioReceived: false, audioBeforeGuardrail: false, firstAudioMs: null as number | null };
+    classified: false, audioReceived: false, preToolAudioDiscarded: false, firstAudioMs: null as number | null };
   let sentAt = 0;
   await new Promise<void>((resolve, reject) => {
     timeout = setTimeout(() => reject(new Error("Provider smoke timed out")), 40_000);
@@ -46,9 +46,14 @@ try {
       }
       if (event.type === "error") reject(new Error(`Provider error: ${event.error?.code ?? "unknown"}`));
       if (event.type === "response.output_audio.delta") {
-        result.audioReceived = true;
-        result.audioBeforeGuardrail ||= !(assessment ? result.classified : result.contextRead && result.validGuidance);
-        result.firstAudioMs ??= Math.round(performance.now() - sentAt);
+        // Match the browser gate: discard provider preambles until the first
+        // mandatory tool has returned. They are never played to the student.
+        const verified = assessment ? result.classified : result.contextRead;
+        result.preToolAudioDiscarded ||= !verified;
+        if (verified) {
+          result.audioReceived = true;
+          result.firstAudioMs ??= Math.round(performance.now() - sentAt);
+        }
       }
       if (event.type === "response.done") {
         if (event.response.status === "failed") { reject(new Error(`Provider response failed: ${event.response.status_details?.error?.code}`)); return; }
@@ -74,7 +79,7 @@ try {
     socket.onclose = () => resolve();
   });
   console.log(JSON.stringify(result));
-  if (!result.audioReceived || result.audioBeforeGuardrail || (assessment ? !result.classified : !result.contextRead || !result.validGuidance)) process.exitCode = 1;
+  if (!result.audioReceived || (assessment ? !result.classified : !result.contextRead || !result.validGuidance)) process.exitCode = 1;
 } catch (error) {
   console.error(String((error as Error).message).replaceAll(apiKey, "[redacted]").replaceAll(credential || "___", "[redacted]").slice(0, 500));
   process.exitCode = 1;
