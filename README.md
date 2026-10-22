@@ -111,6 +111,17 @@ in one transaction; `test/migration-0005.test.ts` proves it on a database that a
 holds data, and that a failure leaves the database untouched. Rehearse any migration on a
 copy of production (a Neon branch works) before deploying it.
 
+## Seed course MIPA
+
+`bun run db:seed:science -- pengajar@contoh.com` creates one published course owned by
+an existing account, with teacher and student access for testing. It contains four
+modules (Mathematics, Biology, Chemistry, Physics), eight overview lessons ready for
+the teacher's PDF uploads, and one published quiz with 20 multiple-choice questions
+(five per subject), answer keys and explanations. Each question is worth five points;
+the quiz allows 60 minutes and has no opening/closing dates. The seed does not start
+an attempt for the teacher. Rerunning it for the same account preserves all existing
+content, PDFs, enrollments, and attempts. The original `db:seed` command is unchanged.
+
 ## Tests
 
 The suite uses a real Postgres (no mocks): it creates a throw-away database, applies the
