@@ -19,7 +19,9 @@ describe("PDF tutor authorization", () => {
     expect((await api(null, "POST", endpoint, body)).status).toBe(401);
     expect((await api(student, "POST", endpoint, { resourceId: "bad-id" })).status).toBe(400);
     expect((await api(outsider, "POST", endpoint, body)).status).toBe(404);
-    expect((await api(teacher, "POST", endpoint, body)).status).toBe(404);
+    const teacherSession = await api(teacher, "POST", endpoint, body);
+    expect(teacherSession.status).toBe(503);
+    expect(teacherSession.body.code).toBe("AI_TUTOR_UNAVAILABLE");
     expect((await api(student, "POST", endpoint, { resourceId: crypto.randomUUID() })).status).toBe(404);
     // The test environment intentionally has no Gemini key. Only an authorized
     // student reaches the configuration check; no network call is made.
@@ -29,6 +31,7 @@ describe("PDF tutor authorization", () => {
     expect(authorized.headers.get("cache-control")).toBe("no-store");
     await api(teacher, "PATCH", `/api/manage/lessons/${lesson.body.id}`, { status: "draft" });
     expect((await api(student, "POST", endpoint, body)).status).toBe(404);
+    expect((await api(teacher, "POST", endpoint, body)).status).toBe(404);
   });
 });
 

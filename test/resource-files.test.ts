@@ -117,11 +117,10 @@ describe("uploading a PDF resource", () => {
     expect((await download(outsider, studentFile(id))).status).toBe(404);
     expect((await download(otherTeacher, studentFile(id))).status).toBe(404);
     expect((await download(otherTeacher, manageFile(id))).status).toBe(404);
-    // a student is not a teacher, and the student API is not for the course's own teacher
-    // (it answers 404 for the lesson itself, so it must for the lesson's files)
+    // Students cannot manage files; the auto-enrolled teacher can test the learning view.
     expect((await download(student, manageFile(id))).status).toBe(404);
-    expect((await api(teacher, "GET", `/api/student/lessons/${lessonId}`)).status).toBe(404);
-    expect((await download(teacher, studentFile(id))).status).toBe(404);
+    expect((await api(teacher, "GET", `/api/student/lessons/${lessonId}`)).status).toBe(200);
+    expect((await download(teacher, studentFile(id))).status).toBe(200);
     expect((await download(student, studentFile(crypto.randomUUID()))).status).toBe(404);
     expect((await download(student, studentFile("bukan-uuid"))).status).toBe(400);
 
@@ -134,6 +133,7 @@ describe("uploading a PDF resource", () => {
     // a lesson hidden from students hides its files too, a teacher still sees them
     await api(teacher, "PATCH", `/api/manage/lessons/${lessonId}`, { status: "draft" });
     expect((await download(student, studentFile(id))).status).toBe(404);
+    expect((await download(teacher, studentFile(id))).status).toBe(404);
     expect((await download(teacher, manageFile(id))).status).toBe(200);
     await api(teacher, "PATCH", `/api/manage/lessons/${lessonId}`, { status: "published" });
     expect((await download(student, studentFile(id))).status).toBe(200);

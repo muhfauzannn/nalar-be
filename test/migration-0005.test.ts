@@ -107,7 +107,8 @@ describe("migration 0005 (school removal) on a database that already holds data"
 
     const memberships = await client`select id, user_id, role, status from course_membership order by id`;
     const byId = new Map(memberships.map((row) => [row.id, row]));
-    expect(memberships).toHaveLength(3);
+    // The later teacher self-enrollment migration adds one learning membership.
+    expect(memberships).toHaveLength(4);
     expect(byId.get(f.cmTeacher)).toMatchObject({ user_id: f.teacher, role: "teacher", status: "active" });
     expect(byId.get(f.cmStudent1)).toMatchObject({ user_id: f.student, role: "student", status: "active" });
     // enrolled through the student's OTHER school: still the same person

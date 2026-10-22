@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { and, asc, desc, eq, inArray, notExists, sql } from "drizzle-orm";
+import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "../../database/client";
 import { publicResource } from "../../lib/pdf-upload";
@@ -181,6 +181,23 @@ export async function listActiveScenarios() {
 
 // ---- courses ------------------------------------------------------------
 
+// Teachers enroll to test the learning flow, but are not counted as their own pupils.
+function countedStudent() {
+  const teacher = alias(courseMembership, "counted_student_teacher");
+  return and(
+    eq(courseMembership.role, "student"),
+    inArray(courseMembership.status, ["active", "completed"]),
+    notExists(
+      db.select({ id: teacher.id }).from(teacher).where(and(
+        eq(teacher.courseId, courseMembership.courseId),
+        eq(teacher.userId, courseMembership.userId),
+        eq(teacher.role, "teacher"),
+        eq(teacher.status, "active"),
+      )),
+    ),
+  );
+}
+
 export async function countTeachingCourses(userId: string) {
   const [row] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -208,13 +225,19 @@ export async function createCourseWithTeacher(input: {
       .returning({ id: course.id });
     if (!created) throw new Error("Course gagal dibuat.");
 
-    await tx.insert(courseMembership).values({
+    await tx.insert(courseMembership).values([{
       courseId: created.id,
       userId: input.userId,
       role: "teacher",
       status: "active",
       activatedAt: new Date(),
-    });
+    }, {
+      courseId: created.id,
+      userId: input.userId,
+      role: "student",
+      status: "active",
+      activatedAt: new Date(),
+    }]);
     return created;
   });
 }
@@ -252,8 +275,7 @@ export async function listTeacherCourses(userId: string) {
       .where(
         and(
           inArray(courseMembership.courseId, ids),
-          eq(courseMembership.role, "student"),
-          inArray(courseMembership.status, ["active", "completed"]),
+          countedStudent(),
         ),
       )
       .groupBy(courseMembership.courseId),
@@ -368,8 +390,7 @@ export async function getCourseEditor(courseId: string) {
       .where(
         and(
           eq(courseMembership.courseId, courseId),
-          eq(courseMembership.role, "student"),
-          inArray(courseMembership.status, ["active", "completed"]),
+          countedStudent(),
         ),
       ),
   ]);

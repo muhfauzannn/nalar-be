@@ -383,7 +383,7 @@ describe("quizzes of other courses", () => {
     const mine = await api(alice, "GET", "/api/manage/courses");
     const attending = await api(alice, "GET", "/api/student/courses");
     expect(mine.body.courses.map((c: any) => c.name)).toEqual(["Kelas Alice"]);
-    expect(attending.body.courses.map((c: any) => c.name)).toEqual(["Kelas Bob"]);
+    expect(attending.body.courses.map((c: any) => c.name)).toEqual(["Kelas Alice", "Kelas Bob"]);
     // Bob's quiz tooling stays closed to Alice even though she attends his course.
     const bobQuiz = await api(bob, "POST", `/api/manage/courses/${bobCourse.id}/quizzes`, { title: "Rahasia" });
     expect((await api(alice, "GET", `/api/manage/quizzes/${bobQuiz.body.id}`)).status).toBe(404);

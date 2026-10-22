@@ -13,8 +13,11 @@ open http://localhost:3000
 ## Course model
 
 There is no school or tenant. Any registered user can create a course and becomes its
-teacher; roles exist only per course (`course_membership.role`). Other users join with
-the course's class code and become students.
+teacher and is automatically enrolled as a student to test the learning flow. Roles
+exist only per course (`course_membership.role`). Other users join with the course's
+class code and become students. The teacher's test enrollment is excluded from student
+counts. Courses appear in Course Saya after publication; normal student visibility
+rules also apply to teachers testing their courses.
 
 | Area | Base path | Who |
 | --- | --- | --- |
@@ -99,6 +102,9 @@ against a database you care about without checking `DATABASE_URL` first.
 Migration `0006_resource_files.sql` only adds three nullable columns to `learning_resource`
 (and widens its payload check), so the previous release keeps working on a migrated
 database; `test/migration-0006.test.ts` proves it on existing rows.
+
+Migration `0007_teacher_self_enrollment.sql` enrolls existing active teachers as students,
+without changing any existing student membership or progress.
 
 Migration `0005_school_removal.sql` is hand-written (expand, backfill, contract) and runs
 in one transaction; `test/migration-0005.test.ts` proves it on a database that already

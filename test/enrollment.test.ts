@@ -118,14 +118,39 @@ describe("joining a course with a class code", () => {
     expect((await joinCourse(later, reset.body.joinCode)).status).toBe(200);
   });
 
-  test("the teacher cannot enroll as a student in their own course", async () => {
+  test("the creator is auto-enrolled and can open their published course as a student", async () => {
     const teacher = await newUser("teacher");
     const course = await makeCourse(teacher);
+    const memberships = await db.select().from(courseMembership).where(and(
+      eq(courseMembership.courseId, course.id), eq(courseMembership.userId, teacher.id),
+    ));
+    expect(memberships.map((entry) => entry.role).sort()).toEqual(["student", "teacher"]);
+    expect(memberships.every((entry) => entry.status === "active" && entry.activatedAt)).toBe(true);
+    // Drafts still follow the normal student publication rules.
+    expect((await api(teacher, "GET", "/api/student/courses")).body.courses).toEqual([]);
     await publishCourse(teacher, course.id);
 
+    const list = await api(teacher, "GET", "/api/student/courses");
+    expect(list.body.courses.map((entry: { id: string }) => entry.id)).toEqual([course.id]);
+    expect((await api(teacher, "GET", `/api/student/courses/${course.id}`)).status).toBe(200);
+    expect((await api(teacher, "GET", `/api/manage/courses/${course.id}`)).status).toBe(200);
     const reply = await joinCourse(teacher, course.joinCode);
-    expect(reply.status).toBe(409);
-    expect(reply.body.code).toBe("JOIN_IS_TEACHER");
+    expect(reply.status).toBe(200);
+    expect(reply.body.alreadyJoined).toBe(true);
+  });
+
+  test("a teacher without a student membership can join their own course with its code", async () => {
+    const teacher = await newUser("legacy-teacher");
+    const course = await makeCourse(teacher);
+    await db.delete(courseMembership).where(and(
+      eq(courseMembership.courseId, course.id), eq(courseMembership.userId, teacher.id),
+      eq(courseMembership.role, "student"),
+    ));
+    await publishCourse(teacher, course.id);
+    const replies = await Promise.all(Array.from({ length: 3 }, () => joinCourse(teacher, course.joinCode)));
+    expect(replies.every((reply) => reply.status === 200)).toBe(true);
+    expect(replies.filter((reply) => !reply.body.alreadyJoined)).toHaveLength(1);
+    expect((await api(teacher, "GET", `/api/student/courses/${course.id}`)).status).toBe(200);
   });
 
   test("requires a session and a string code", async () => {

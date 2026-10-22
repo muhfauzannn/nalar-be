@@ -172,8 +172,8 @@ export const subject = pgTable(
   (table) => [unique("subject_code_unique").on(table.code)],
 );
 
-// A course is created by any user, who becomes its teacher through
-// `course_membership`. Others enroll as students with `join_code` (stored
+// A course is created by any user, who becomes its teacher and is also enrolled
+// as a student for testing. Others enroll with `join_code` (stored
 // upper-case; null = joining disabled).
 export const course = pgTable(
   "course",

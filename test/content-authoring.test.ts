@@ -77,6 +77,15 @@ describe("any registered user can create a course", () => {
 });
 
 describe("course status", () => {
+  test("a teacher's test enrollment does not inflate student counts or prevent returning to draft", async () => {
+    const teacher = await newUser("teacher");
+    const course = await makeCourse(teacher);
+    await publishCourse(teacher, course.id);
+    expect((await api(teacher, "GET", `/api/manage/courses/${course.id}`)).body.studentCount).toBe(0);
+    expect((await api(teacher, "GET", "/api/manage/courses")).body.courses[0].studentCount).toBe(0);
+    expect((await api(teacher, "PATCH", `/api/manage/courses/${course.id}`, { status: "draft" })).status).toBe(200);
+  });
+
   test("draft -> published -> archived -> published is allowed", async () => {
     const teacher = await newUser("teacher");
     const course = await makeCourse(teacher);

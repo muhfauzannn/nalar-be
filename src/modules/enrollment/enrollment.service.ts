@@ -11,7 +11,6 @@ import {
 export type EnrollmentErrorCode =
   | "JOIN_CODE_INVALID"
   | "JOIN_RATE_LIMITED"
-  | "JOIN_IS_TEACHER"
   | "JOIN_REMOVED";
 
 export class EnrollmentServiceError extends Error {
@@ -60,14 +59,6 @@ export async function joinCourseWithCode(userId: string, rawCode: string) {
   if (!courseRow || courseRow.status !== "published") throw fail();
 
   const roles = await listCourseRoles(courseRow.id, userId);
-  if (roles.some((entry) => entry.role === "teacher")) {
-    throw new EnrollmentServiceError(
-      409,
-      "Kamu adalah pengajar course ini.",
-      "JOIN_IS_TEACHER",
-    );
-  }
-
   const student = roles.find((entry) => entry.role === "student");
   const summary = { id: courseRow.id, name: courseRow.name };
   if (student) {
