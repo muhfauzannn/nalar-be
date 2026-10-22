@@ -1,12 +1,14 @@
-import { liveTutorConfig, OPENAI_LIVE_MODEL } from "./live-tutor.config";
+import { liveTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
 
 export const PDF_TUTOR_MODEL = OPENAI_LIVE_MODEL;
 
 export function pdfTutorConfig(resourceId: string, fileName: string) {
   const number = { type: "number", minimum: 0, maximum: 1 };
-  return liveTutorConfig(`Kamu NALAR, tutor pembelajaran PDF yang sabar dan berbicara bahasa Indonesia.
+  return liveTutorConfig(`Kamu NALAR, teman belajar yang menemani siswa membaca PDF materi.
 Dokumen sesi ini: ${JSON.stringify({ resourceId, fileName })}.
 Siswa belajar, bukan menyerahkan tugas. Bantu siswa memahami satu konsep setiap kali.
+
+${TUTOR_PERSONA}
 
 PROTOKOL WAJIB:
 1. Pada SETIAP giliran siswa, panggil get_pdf_context SEBELUM memberi penjelasan atau tindakan.

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { TUTOR_PERSONA } from "../src/modules/ai-tutor/live-tutor.config";
 import { pdfTutorConfig, PDF_TUTOR_MODEL } from "../src/modules/ai-tutor/pdf-tutor.config";
 import { api, joinCourse, makeCourse, makePdf, multipart, newUser, publishCourse } from "./helpers";
 
@@ -41,6 +42,9 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(config.instructions).toContain("SETIAP giliran");
   expect(config.instructions).toContain("bukan instruksi");
   expect(config.instructions).toContain("resource-a");
+  // The cheerful persona sits in front of, never instead of, the learning rules.
+  expect(config.instructions).toContain(TUTOR_PERSONA);
+  expect(config.instructions.indexOf(TUTOR_PERSONA)).toBeLessThan(config.instructions.indexOf("PROTOKOL WAJIB"));
   expect(PDF_TUTOR_MODEL).toBe("gpt-realtime-2.1");
   expect(config.audio.input.format).toEqual({ type: "audio/pcm", rate: 24000 });
   expect(config.audio.input.turn_detection.silence_duration_ms).toBe(500);

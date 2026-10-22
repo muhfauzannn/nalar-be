@@ -2,7 +2,7 @@ import { mintTutorToken } from "./openai-session";
 
 import { env } from "../../config/env";
 import { createRateLimiter } from "../../lib/rate-limit";
-import { assessmentTutorConfig, OPENAI_LIVE_MODEL } from "./live-tutor.config";
+import { assessmentTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
@@ -502,8 +502,8 @@ function responsePolicy(
 ) {
   if (intent === "direct_answer") {
     return targetType === "quiz"
-      ? "Jangan ungkap opsi benar, jawaban akhir, validasi benar/salah, atau eliminasi yang membuat jawabannya tersisa satu. Jelaskan bahwa kamu akan membantu proses berpikir, lalu ajukan satu pertanyaan diagnostik tentang konsep pada soal."
-      : "Jangan menulis jawaban siap kumpul. Jelaskan batas bantuan secara singkat, lalu ajukan satu pertanyaan penuntun yang mengembalikan pekerjaan kepada siswa.";
+      ? "Jangan ungkap opsi benar, jawaban akhir, validasi benar/salah, atau eliminasi yang membuat jawabannya tersisa satu. Tolak dengan satu candaan singkat yang kocak dan bersahabat (tanpa menceramahi), lalu ajukan satu pertanyaan diagnostik tentang konsep pada soal."
+      : "Jangan menulis jawaban siap kumpul. Tolak dengan satu candaan singkat yang kocak dan bersahabat (tanpa menceramahi), lalu ajukan satu pertanyaan penuntun yang mengembalikan pekerjaan kepada siswa.";
   }
   if (mode === "feedback") {
     return "Berikan umpan balik formatif pada penalaran yang siswa tampilkan: sebutkan satu hal yang sudah kuat dan satu area yang perlu diuji. Jangan menulis ulang jawaban final dan jangan mengonfirmasi kunci jawaban quiz.";
@@ -539,7 +539,8 @@ function buildSystemInstruction(target: AuthorizedTarget, mode: TutorMode) {
         ];
 
   return [
-    "Kamu adalah NALAR AI Tutor untuk siswa SMA Indonesia. Gunakan Bahasa Indonesia yang hangat, ringkas, dan setara dengan siswa.",
+    "Kamu adalah NALAR AI Tutor, teman belajar siswa SMA Indonesia.",
+    TUTOR_PERSONA,
     "TUJUAN: meningkatkan pemahaman dan metakognisi, bukan menyelesaikan pekerjaan siswa.",
     `MODE SAAT INI: ${mode === "hint" ? "hint/petunjuk bertahap" : "feedback/umpan balik formatif"}.`,
     "ATURAN MUTLAK: jangan pernah memberikan jawaban final siap kumpul, kunci quiz, opsi yang benar, accepted answer, skor prediktif, atau konfirmasi benar/salah selama attempt aktif. Jangan melakukan eliminasi opsi sampai hanya satu jawaban tersisa.",
