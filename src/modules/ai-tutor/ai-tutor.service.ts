@@ -2,7 +2,7 @@ import { mintTutorToken } from "./openai-session";
 
 import { env } from "../../config/env";
 import { createRateLimiter } from "../../lib/rate-limit";
-import { assessmentTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
+import { assessmentTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA, type TutorAudioFormat } from "./live-tutor.config";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
@@ -86,6 +86,7 @@ export async function createAiTutorSession(input: {
   userId: string;
   target: TutorTargetInput;
   mode: TutorMode;
+  audioFormat?: TutorAudioFormat;
 }) {
   const limit = tutorSessionLimiter.check(input.userId);
   if (!limit.allowed) {
@@ -118,12 +119,13 @@ export async function createAiTutorSession(input: {
   const systemInstruction = buildSystemInstruction(target, input.mode);
 
   try {
-    const credential = await mintTutorToken(env.openaiApiKey, assessmentTutorConfig(systemInstruction), input.userId);
+    const credential = await mintTutorToken(env.openaiApiKey, assessmentTutorConfig(systemInstruction, input.audioFormat), input.userId);
     const messages = await listTutorMessages(conversation.id);
     return {
       conversationId: conversation.id,
       ...credential,
       model: OPENAI_LIVE_MODEL,
+      audioFormat: input.audioFormat ?? "pcm",
       mode: input.mode,
       questionId: target.questionId ?? null,
       messages:

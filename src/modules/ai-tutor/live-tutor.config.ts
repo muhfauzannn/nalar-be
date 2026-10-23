@@ -2,6 +2,20 @@ export const OPENAI_LIVE_MODEL = "gpt-realtime-2.1";
 export const TUTOR_SILENCE_DURATION_MS = 500;
 
 /**
+ * Wire format for both audio directions. "pcmu" (G.711 mu-law, 8 kHz) is ~6x smaller than
+ * 24 kHz PCM; on a mobile uplink PCM's ~512 kbps backs up the socket and answers arrive seconds
+ * late. Clients ask for it; anything else (older clients) keeps PCM.
+ */
+export type TutorAudioFormat = "pcm" | "pcmu";
+export function tutorAudioFormat(value: unknown): TutorAudioFormat {
+  return value === "pcmu" ? "pcmu" : "pcm";
+}
+const AUDIO_FORMATS = {
+  pcm: { type: "audio/pcm", rate: 24_000 },
+  pcmu: { type: "audio/pcmu" },
+} as const;
+
+/**
  * How every voice tutor sounds: a cheerful, funny study buddy, not a formal
  * teacher. Shared so the PDF tutor and the quiz/assignment tutor feel like the
  * same NALAR. Humour never overrides the learning rules that follow it.
@@ -28,7 +42,7 @@ export type TutorTool = {
   parameters: Record<string, unknown>;
 };
 
-export function liveTutorConfig(instructions: string, tools: TutorTool[], maxOutputTokens = 700) {
+export function liveTutorConfig(instructions: string, tools: TutorTool[], maxOutputTokens = 700, audioFormat: TutorAudioFormat = "pcm") {
   return {
     type: "realtime" as const,
     model: OPENAI_LIVE_MODEL,
@@ -37,7 +51,7 @@ export function liveTutorConfig(instructions: string, tools: TutorTool[], maxOut
     max_output_tokens: maxOutputTokens,
     audio: {
       input: {
-        format: { type: "audio/pcm", rate: 24_000 },
+        format: AUDIO_FORMATS[audioFormat],
         transcription: { model: "gpt-4o-mini-transcribe", language: "id" },
         noise_reduction: { type: "near_field" },
         turn_detection: {
@@ -46,7 +60,7 @@ export function liveTutorConfig(instructions: string, tools: TutorTool[], maxOut
           create_response: true, interrupt_response: true,
         },
       },
-      output: { format: { type: "audio/pcm", rate: 24_000 }, voice: "marin" },
+      output: { format: AUDIO_FORMATS[audioFormat], voice: "marin" },
     },
     tools,
     // Force the guardrail/context tool on each new student turn. Tool continuations
@@ -56,7 +70,7 @@ export function liveTutorConfig(instructions: string, tools: TutorTool[], maxOut
   };
 }
 
-export function assessmentTutorConfig(systemInstruction: string) {
+export function assessmentTutorConfig(systemInstruction: string, audioFormat: TutorAudioFormat = "pcm") {
   return liveTutorConfig(systemInstruction, [{
     type: "function",
     name: "classify_student_prompt",
@@ -66,5 +80,5 @@ export function assessmentTutorConfig(systemInstruction: string) {
       properties: { content: { type: "string", description: "Transkrip lengkap ucapan siswa pada giliran ini." } },
       required: ["content"],
     },
-  }]);
+  }], undefined, audioFormat);
 }

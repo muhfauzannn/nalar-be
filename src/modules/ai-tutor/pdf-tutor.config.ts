@@ -1,8 +1,8 @@
-import { liveTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
+import { liveTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA, type TutorAudioFormat } from "./live-tutor.config";
 
 export const PDF_TUTOR_MODEL = OPENAI_LIVE_MODEL;
 
-export function pdfTutorConfig(resourceId: string, fileName: string) {
+export function pdfTutorConfig(resourceId: string, fileName: string, audioFormat: TutorAudioFormat = "pcm") {
   const number = { type: "number", minimum: 0, maximum: 1 };
   return liveTutorConfig(`Kamu NALAR, teman belajar yang menemani siswa membaca PDF materi.
 Dokumen sesi ini: ${JSON.stringify({ resourceId, fileName })}.
@@ -80,5 +80,5 @@ PROTOKOL WAJIB:
           },
         },
       },
-  ], 1000);
+  ], 1000, audioFormat);
 }

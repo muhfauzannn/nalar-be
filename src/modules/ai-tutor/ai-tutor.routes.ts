@@ -9,6 +9,7 @@ import {
 } from "./ai-tutor.service";
 import type { TutorMode } from "./ai-tutor.repository";
 import { createPdfTutorSession } from "./pdf-tutor.service";
+import { tutorAudioFormat } from "./live-tutor.config";
 
 export const aiTutorRoutes = new Hono<{ Variables: AuthVariables }>();
 
@@ -20,6 +21,7 @@ aiTutorRoutes.post("/pdf-sessions", async (context) => {
   return context.json(await createPdfTutorSession(
     context.get("session").user.id,
     requiredId(body.resourceId, "ID PDF"),
+    tutorAudioFormat(body.audioFormat),
   ), 201);
 });
 
@@ -35,6 +37,7 @@ aiTutorRoutes.post("/sessions", async (context) => {
         userId: context.get("session").user.id,
         target: { targetType, targetId },
         mode,
+        audioFormat: tutorAudioFormat(body.audioFormat),
       }),
       201,
     );
@@ -49,6 +52,7 @@ aiTutorRoutes.post("/sessions", async (context) => {
           questionId: requiredId(body.questionId, "ID soal"),
         },
         mode,
+        audioFormat: tutorAudioFormat(body.audioFormat),
       }),
       201,
     );
