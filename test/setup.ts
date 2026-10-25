@@ -36,7 +36,7 @@ process.env.FRONTEND_URL ??= "http://localhost:5173";
 process.env.TRUSTED_ORIGIN ??= "http://localhost:5173";
 process.env.GOOGLE_CLIENT_ID ??= "test-google-client-id";
 process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
-delete process.env.OPENAI_API_KEY; // AI paths must degrade gracefully, never call out
+delete process.env.GEMINI_API_KEY; // AI paths must degrade gracefully, never call out
 
 // Uploaded files go to a throw-away directory, never to ./uploads, unless the run is
 // pointed at an S3-compatible server with TEST_S3_* (the same suite then proves the S3

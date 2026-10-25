@@ -157,22 +157,17 @@ TEST_S3_ENDPOINT=http://localhost:9000 TEST_S3_BUCKET=nalar-test \
 
 ## Tutor suara PDF
 
-Tutor PDF, quiz, dan assignment memakai OpenAI `gpt-realtime-2.1` dengan suara Marin.
-Backend membuat credential sementara (60 detik untuk memulai koneksi), bukan
-mengirim API key utama. Koneksi browser memakai Realtime WebSocket, PCM mono
-24 kHz, transkripsi bahasa Indonesia, dan deteksi akhir ucapan 500 ms.
-Sesi aplikasi dibatasi 55 menit; TTL credential berbeda dari durasi sesi.
-Pada setiap pertanyaan siswa, konfigurasi memaksa tool klasifikasi (kuis/tugas)
-atau `get_pdf_context` (PDF). Setelah tool selesai, respons dilanjutkan dengan
-`tool_choice: auto`. Jawaban suara baru diputar setelah guardrail/konteks tersedia.
-Perubahan halaman dan interupsi membatalkan respons serta tindakan yang tertunda.
+Tutor PDF, quiz, dan assignment memakai `gemini-3.8-live` (konfigurasi bersama di
+`live-tutor.config.ts`). Sesi tidak mengirim `thinkingConfig` atau `languageCode`;
+bahasa Indonesia ditentukan oleh instruksi tutor. Tool klasifikasi dan panduan PDF
+memakai `BLOCKING` agar tutor menunggu hasil sebelum menjawab. Deteksi akhir ucapan
+menunggu 500 ms tanpa suara. Mikrofon dikirim sebagai PCM 16 kHz.
 
-`POST /api/student/ai-tutor/pdf-sessions` dengan `{ resourceId }` membuat credential
-untuk pembelajaran PDF. Akses mengikuti aturan file siswa (membership dan status
-publikasi materi); sesi berbagi rate limiter tutor yang ada.
-Konfigurasi memakai `OPENAI_API_KEY` di server. Analisis refleksi belajar memakai
-Responses API dengan `gpt-4.1-mini`, JSON schema ketat, dan `store: false`.
-Tidak memerlukan migrasi database. Akun API perlu saldo/billing aktif.
+`POST /api/student/ai-tutor/pdf-sessions` dengan `{ resourceId }` membuat token
+Gemini Live sekali pakai untuk pembelajaran PDF. Akses mengikuti aturan file siswa
+(membership dan status publikasi materi); sesi berbagi rate limiter tutor yang ada.
+Konfigurasi memakai `GEMINI_API_KEY` yang sama; analisis refleksi belajar memakai
+`gemini-2.5-flash`. Tidak memerlukan migrasi database.
 Percakapan PDF bersifat sementara di frontend; tutor tugas/kuis tetap memakai
 penyimpanan percakapannya yang ada.
 
@@ -180,5 +175,3 @@ penyimpanan percakapannya yang ada.
 dan audio menggunakan materi sintetis. Ini memanggil provider berbayar. Opsional:
 `PDF_TUTOR_SMOKE_IMAGE=/path/to/fixture.jpg bun run tutor:smoke` untuk input visual.
 Kredensial tidak dicetak. Uji akses endpoint ada di `test/pdf-tutor.test.ts`.
-
-Uji tutor kuis/tugas sintetis: `TUTOR_SMOKE_MODE=assessment bun run tutor:smoke`.

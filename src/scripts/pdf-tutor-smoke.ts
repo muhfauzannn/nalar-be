@@ -1,89 +1,76 @@
-/** Explicit paid provider check using synthetic materials, never the database. */
+/** Optional paid provider smoke test. Uses a synthetic lesson, never the database. */
 import { readFile } from "node:fs/promises";
-import { pdfTutorConfig, PDF_TUTOR_MODEL } from "../modules/ai-tutor/pdf-tutor.config";
-import { assessmentTutorConfig } from "../modules/ai-tutor/live-tutor.config";
-import { mintTutorToken } from "../modules/ai-tutor/openai-session";
+import { GoogleGenAI, type Session } from "@google/genai";
+import { PDF_TUTOR_MODEL, pdfTutorConfig } from "../modules/ai-tutor/pdf-tutor.config";
 
-const apiKey = process.env.OPENAI_API_KEY?.trim();
-if (!apiKey) throw new Error("OPENAI_API_KEY wajib diisi untuk smoke test provider.");
-const assessment = process.env.TUTOR_SMOKE_MODE === "assessment";
+const apiKey = process.env.GEMINI_API_KEY?.trim();
+if (!apiKey) throw new Error("GEMINI_API_KEY wajib diisi untuk smoke test provider.");
 const imagePath = process.env.PDF_TUTOR_SMOKE_IMAGE;
 const image = imagePath ? (await readFile(imagePath)).toString("base64") : null;
-const context = {
-  resourceId: "smoke-pdf", page: 1, totalPages: 1, revision: 1, turnId: "smoke-turn",
-  viewport: { x: 0, y: 0, width: 1, height: 1 },
-  selection: { text: "Pembilang menunjukkan bagian yang dipilih.", x: 0.1, y: 0.2, width: 0.6, height: 0.05 },
-  blocks: [{ id: "p1-b1", text: "Pembilang menunjukkan bagian yang dipilih.", x: 0.1, y: 0.2, width: 0.6, height: 0.05 }],
-  imageAvailable: !!image,
-};
-let socket: WebSocket | undefined;
-let timeout: ReturnType<typeof setTimeout> | undefined;
 let credential = "";
+let session: Session | null = null;
+let timeout: ReturnType<typeof setTimeout> | undefined;
 try {
-  const config = assessment
-    ? assessmentTutorConfig("Kamu tutor matematika bahasa Indonesia. Wajib classify_student_prompt pada setiap pertanyaan sebelum menjawab dan ikuti responseInstruction dari hasilnya. Jangan beri jawaban akhir kuis. Beri satu petunjuk singkat.")
-    : pdfTutorConfig(context.resourceId, "Pecahan.pdf");
-  const token = await mintTutorToken(apiKey, config, "bernalar-synthetic-smoke");
-  credential = token.token;
-  const result = { model: PDF_TUTOR_MODEL, mode: assessment ? "assessment" : "pdf", tokenMinted: true,
-    connected: false, configurationRetained: false, contextRead: false, validGuidance: false,
-    classified: false, audioReceived: false, preToolAudioDiscarded: false, firstAudioMs: null as number | null };
+  const client = new GoogleGenAI({ apiKey });
+  const token = await client.authTokens.create({ config: {
+    uses: 1, expireTime: new Date(Date.now() + 120_000).toISOString(),
+    newSessionExpireTime: new Date(Date.now() + 60_000).toISOString(),
+    httpOptions: { apiVersion: "v1alpha" },
+    liveConnectConstraints: { model: PDF_TUTOR_MODEL, config: pdfTutorConfig("smoke-pdf", "Pecahan.pdf") },
+  } });
+  if (!token.name) throw new Error("Provider tidak mengembalikan token.");
+  credential = token.name;
+  const ephemeral = new GoogleGenAI({ apiKey: credential, httpOptions: { apiVersion: "v1alpha" } });
+  let resolveDone: () => void = () => {};
+  const done = new Promise<void>((resolve) => { resolveDone = resolve; });
+  const result = { model: PDF_TUTOR_MODEL, tokenMinted: true, connected: false, contextRead: false, validGuidance: false, audioReceived: false, imageSent: !!image, firstAudioMs: null as number | null };
   let sentAt = 0;
-  await new Promise<void>((resolve, reject) => {
-    timeout = setTimeout(() => reject(new Error("Provider smoke timed out")), 40_000);
-    socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${PDF_TUTOR_MODEL}`, ["realtime", `openai-insecure-api-key.${credential}`]);
-    const send = (event: Record<string, unknown>) => socket!.send(JSON.stringify(event));
-    socket.onmessage = (message) => {
-      const event = JSON.parse(String(message.data));
-      if (event.type === "session.created") {
-        result.connected = true;
-        result.configurationRetained = event.session.instructions === config.instructions && event.session.tools?.length === config.tools.length;
-        if (!result.configurationRetained) { reject(new Error("Ephemeral session lost tutor configuration")); return; }
-        if (image) send({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_image", image_url: `data:image/jpeg;base64,${image}` }] } });
-        sentAt = performance.now();
-        send({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: assessment ? "Bagaimana cara menjumlahkan pecahan berbeda penyebut?" : "Jelaskan pembilang yang dipilih sambil menunjukkannya. Cukup dua kalimat." }] } });
-        send({ type: "response.create" });
-      }
-      if (event.type === "error") reject(new Error(`Provider error: ${event.error?.code ?? "unknown"}`));
-      if (event.type === "response.output_audio.delta") {
-        // Match the browser gate: discard provider preambles until the first
-        // mandatory tool has returned. They are never played to the student.
-        const verified = assessment ? result.classified : result.contextRead;
-        result.preToolAudioDiscarded ||= !verified;
-        if (verified) {
-          result.audioReceived = true;
-          result.firstAudioMs ??= Math.round(performance.now() - sentAt);
+  const context = {
+    resourceId: "smoke-pdf", page: 1, totalPages: 1, revision: 1, turnId: "smoke-turn",
+    viewport: { x: 0, y: 0, width: 1, height: 1 },
+    selection: image ? { text: "Diagram pembagian pada gambar halaman", x: 0.09, y: 0.31, width: 0.6, height: 0.13 }
+      : { text: "Pembilang menunjukkan bagian yang dipilih.", x: 0.1, y: 0.2, width: 0.6, height: 0.05 },
+    blocks: image ? [] : [{ id: "p1-b1", text: "Pembilang menunjukkan bagian yang dipilih.", x: 0.1, y: 0.2, width: 0.6, height: 0.05 }],
+    imageAvailable: !!image,
+  };
+  session = await ephemeral.live.connect({ model: PDF_TUTOR_MODEL, config: {}, callbacks: {
+    onmessage: (message) => {
+      if (!session) return;
+      for (const call of message.toolCall?.functionCalls ?? []) {
+        let response: Record<string, unknown>;
+        if (call.name === "get_pdf_context") {
+          result.contextRead = true;
+          session.sendClientContent({ turns: [{ role: "user", parts: [{ text: `PDF_VIEW_STATE ${JSON.stringify(context)}` }] }], turnComplete: false });
+          if (image) session.sendRealtimeInput({ video: { data: image, mimeType: "image/jpeg" } });
+          response = context;
+        } else {
+          const args = call.args;
+          const valid = call.name === "present_pdf_guidance" && args?.resourceId === context.resourceId && args?.page === context.page && args?.revision === context.revision && args?.turnId === context.turnId && Array.isArray(args?.actions) && args.actions.length > 0;
+          result.validGuidance ||= valid;
+          response = { ok: valid };
         }
+        session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response }] });
       }
-      if (event.type === "response.done") {
-        if (event.response.status === "failed") { reject(new Error(`Provider response failed: ${event.response.status_details?.error?.code}`)); return; }
-        const calls = event.response.output.filter((item: { type: string }) => item.type === "function_call");
-        for (const call of calls) {
-          let output: Record<string, unknown> = { ok: false };
-          const args = JSON.parse(call.arguments);
-          if (call.name === "classify_student_prompt") {
-            result.classified = typeof args.content === "string" && !!args.content.trim();
-            output = { intent: "explanation_hint", wasRedirected: false, responseInstruction: "Beri satu petunjuk singkat untuk mencari penyebut yang sama, tanpa jawaban akhir." };
-          } else if (call.name === "get_pdf_context") { result.contextRead = true; output = context; }
-          else if (call.name === "present_pdf_guidance") {
-            result.validGuidance = args.resourceId === context.resourceId && args.page === 1 && args.revision === 1 && args.turnId === context.turnId && args.actions?.length > 0;
-            output = { ok: result.validGuidance };
-          }
-          send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) } });
-        }
-        if (calls.length) send({ type: "response.create", response: { tool_choice: "auto" } });
-        else if (result.audioReceived) resolve();
+      if (message.serverContent?.modelTurn?.parts?.some((part) => part.inlineData?.mimeType?.startsWith("audio/"))) {
+        result.audioReceived = true;
+        result.firstAudioMs ??= Math.round(performance.now() - sentAt);
       }
-    };
-    socket.onerror = () => reject(new Error("Provider socket failed"));
-    socket.onclose = () => resolve();
-  });
+      if (message.serverContent?.turnComplete && result.audioReceived) resolveDone();
+    },
+    onerror: () => resolveDone(), onclose: () => resolveDone(),
+  } });
+  result.connected = true;
+  if (image) session.sendRealtimeInput({ video: { data: image, mimeType: "image/jpeg" } });
+  sentAt = performance.now();
+  session.sendClientContent({ turns: [{ role: "user", parts: [{ text: image ? "Jelaskan diagram pecahan yang dipilih pada gambar halaman sambil melingkari bagian yang dibahas. Cukup dua kalimat." : "Jelaskan pembilang yang dipilih sambil menunjukkannya. Cukup dua kalimat." }] }], turnComplete: true });
+  await Promise.race([done, new Promise<void>((resolve) => { timeout = setTimeout(resolve, 30_000); })]);
   console.log(JSON.stringify(result));
-  if (!result.audioReceived || (assessment ? !result.classified : !result.contextRead || !result.validGuidance)) process.exitCode = 1;
+  if (!result.contextRead || !result.validGuidance || !result.audioReceived) process.exitCode = 1;
 } catch (error) {
-  console.error(String((error as Error).message).replaceAll(apiKey, "[redacted]").replaceAll(credential || "___", "[redacted]").slice(0, 500));
+  const message = String((error as Error).message).replaceAll(apiKey, "[redacted]").replaceAll(credential || "___", "[redacted]");
+  console.error(message.slice(0, 1200));
   process.exitCode = 1;
 } finally {
   if (timeout) clearTimeout(timeout);
-  socket?.close();
+  session?.close();
 }

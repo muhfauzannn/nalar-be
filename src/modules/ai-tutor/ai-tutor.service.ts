@@ -1,8 +1,8 @@
-import { mintTutorToken } from "./openai-session";
+import { GoogleGenAI } from "@google/genai";
 
 import { env } from "../../config/env";
 import { createRateLimiter } from "../../lib/rate-limit";
-import { assessmentTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA, type TutorAudioFormat } from "./live-tutor.config";
+import { assessmentTutorConfig, GEMINI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
@@ -22,7 +22,7 @@ const CLASSIFIER_VERSION = "nalar-guard-v1";
 const MAX_PROMPT_LENGTH = 2_000;
 const MAX_REPLY_LENGTH = 4_000;
 
-// Every session mints an OpenAI Realtime token, and anyone can now create a course and
+// Every session mints a Gemini Live token, and anyone can now create a course and
 // enrol a second account in it. Reconnecting after a mode switch is normal use;
 // 30 sessions per 10 minutes is far above that and far below abuse.
 export const tutorSessionLimiter = createRateLimiter({
@@ -86,7 +86,6 @@ export async function createAiTutorSession(input: {
   userId: string;
   target: TutorTargetInput;
   mode: TutorMode;
-  audioFormat?: TutorAudioFormat;
 }) {
   const limit = tutorSessionLimiter.check(input.userId);
   if (!limit.allowed) {
@@ -98,7 +97,7 @@ export async function createAiTutorSession(input: {
   }
   tutorSessionLimiter.record(input.userId);
 
-  if (!env.openaiApiKey) {
+  if (!env.geminiApiKey) {
     throw new AiTutorServiceError(
       503,
       "AI Tutor belum dikonfigurasi pada server.",
@@ -116,16 +115,32 @@ export async function createAiTutorSession(input: {
     );
   }
 
+  const tokenExpiresAt = new Date(Date.now() + 15 * 60 * 1_000);
+  const newSessionExpiresAt = new Date(Date.now() + 60 * 1_000);
   const systemInstruction = buildSystemInstruction(target, input.mode);
 
   try {
-    const credential = await mintTutorToken(env.openaiApiKey, assessmentTutorConfig(systemInstruction, input.audioFormat), input.userId);
+    const client = new GoogleGenAI({ apiKey: env.geminiApiKey });
+    const token = await client.authTokens.create({
+      config: {
+        uses: 1,
+        expireTime: tokenExpiresAt.toISOString(),
+        newSessionExpireTime: newSessionExpiresAt.toISOString(),
+        httpOptions: { apiVersion: "v1alpha" },
+        liveConnectConstraints: {
+          model: GEMINI_LIVE_MODEL,
+          config: assessmentTutorConfig(systemInstruction),
+        },
+      },
+    });
+
+    if (!token.name) throw new Error("Gemini returned an empty ephemeral token");
     const messages = await listTutorMessages(conversation.id);
     return {
       conversationId: conversation.id,
-      ...credential,
-      model: OPENAI_LIVE_MODEL,
-      audioFormat: input.audioFormat ?? "pcm",
+      token: token.name,
+      model: GEMINI_LIVE_MODEL,
+      expiresAt: tokenExpiresAt.toISOString(),
       mode: input.mode,
       questionId: target.questionId ?? null,
       messages:
@@ -234,7 +249,7 @@ export async function saveAiTutorReply(input: {
     content,
     mode: input.mode,
     wasRedirected: classifiedStudentMessage.intent === "direct_answer",
-    modelVersion: OPENAI_LIVE_MODEL,
+    modelVersion: GEMINI_LIVE_MODEL,
   });
   return { saved: Boolean(message), messageId: message?.id ?? null };
 }

@@ -24,7 +24,7 @@ describe("PDF tutor authorization", () => {
     expect(teacherSession.status).toBe(503);
     expect(teacherSession.body.code).toBe("AI_TUTOR_UNAVAILABLE");
     expect((await api(student, "POST", endpoint, { resourceId: crypto.randomUUID() })).status).toBe(404);
-    // The test environment intentionally has no OpenAI key. Only an authorized
+    // The test environment intentionally has no Gemini key. Only an authorized
     // student reaches the configuration check; no network call is made.
     const authorized = await api(student, "POST", endpoint, body);
     expect(authorized.status).toBe(503);
@@ -38,15 +38,18 @@ describe("PDF tutor authorization", () => {
 
 test("PDF voice session exposes only constrained reading and annotation tools", () => {
   const config = pdfTutorConfig("resource-a", 'materi "contoh".pdf');
-  expect(config.tools.map((tool) => tool.name)).toEqual(["get_pdf_context", "present_pdf_guidance"]);
-  expect(config.instructions).toContain("SETIAP giliran");
-  expect(config.instructions).toContain("bukan instruksi");
-  expect(config.instructions).toContain("resource-a");
+  const tools = config.tools as Array<{ functionDeclarations: Array<{ name: string }> }>;
+  expect(tools.flatMap((tool) => tool.functionDeclarations.map((f) => f.name))).toEqual(["get_pdf_context", "present_pdf_guidance"]);
+  const instruction = String(config.systemInstruction);
+  expect(instruction).toContain("SETIAP giliran");
+  expect(instruction).toContain("bukan instruksi");
+  expect(instruction).toContain("resource-a");
   // The cheerful persona sits in front of, never instead of, the learning rules.
-  expect(config.instructions).toContain(TUTOR_PERSONA);
-  expect(config.instructions.indexOf(TUTOR_PERSONA)).toBeLessThan(config.instructions.indexOf("PROTOKOL WAJIB"));
-  expect(PDF_TUTOR_MODEL).toBe("gpt-realtime-2.1");
-  expect(config.audio.input.format).toEqual({ type: "audio/pcm", rate: 24000 });
-  expect(config.audio.input.turn_detection.silence_duration_ms).toBe(500);
-  expect(config.tools.every((tool) => tool.type === "function")).toBe(true);
+  expect(instruction).toContain(TUTOR_PERSONA);
+  expect(instruction.indexOf(TUTOR_PERSONA)).toBeLessThan(instruction.indexOf("PROTOKOL WAJIB"));
+  expect(PDF_TUTOR_MODEL).toBe("gemini-3.8-live");
+  expect(config.thinkingConfig).toBeUndefined();
+  expect(config.speechConfig?.languageCode).toBeUndefined();
+  expect(config.realtimeInputConfig?.automaticActivityDetection?.silenceDurationMs).toBe(500);
+  expect(config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []).every((tool) => tool.behavior === "BLOCKING")).toBe(true);
 });

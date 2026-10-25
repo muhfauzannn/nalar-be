@@ -35,7 +35,7 @@ describe("tutor sessions are rate limited per account", () => {
 
     for (let index = 0; index < 30; index += 1) {
       const reply = await api(user, "POST", "/api/student/ai-tutor/sessions", body);
-      // No OpenAI key in tests: configuration error, but never a rate-limit error yet.
+      // No Gemini key in tests: configuration error, but never a rate-limit error yet.
       expect(reply.status).toBe(503);
       expect(reply.body.code).toBe("AI_TUTOR_UNAVAILABLE");
     }

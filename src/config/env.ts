@@ -154,7 +154,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
   return {
     databaseUrl: required(source, "DATABASE_URL"),
     frontendUrl,
-    openaiApiKey: optional(source, "OPENAI_API_KEY"),
+    geminiApiKey: optional(source, "GEMINI_API_KEY"),
     googleClientId: required(source, "GOOGLE_CLIENT_ID"),
     googleClientSecret: required(source, "GOOGLE_CLIENT_SECRET"),
     port: port(source),

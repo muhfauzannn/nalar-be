@@ -1,10 +1,29 @@
-import { liveTutorConfig, OPENAI_LIVE_MODEL, TUTOR_PERSONA, type TutorAudioFormat } from "./live-tutor.config";
+import { ActivityHandling, Behavior, Modality, type LiveConnectConfig } from "@google/genai";
+import { GEMINI_LIVE_MODEL, TUTOR_PERSONA, TUTOR_SILENCE_DURATION_MS } from "./live-tutor.config";
 
-export const PDF_TUTOR_MODEL = OPENAI_LIVE_MODEL;
+// Keep the lesson tutor on the voice model already used by the assessment tutor.
+export const PDF_TUTOR_MODEL = GEMINI_LIVE_MODEL;
 
-export function pdfTutorConfig(resourceId: string, fileName: string, audioFormat: TutorAudioFormat = "pcm") {
+export function pdfTutorConfig(resourceId: string, fileName: string): LiveConnectConfig {
   const number = { type: "number", minimum: 0, maximum: 1 };
-  return liveTutorConfig(`Kamu NALAR, teman belajar yang menemani siswa membaca PDF materi.
+  return {
+    responseModalities: [Modality.AUDIO],
+    inputAudioTranscription: {},
+    outputAudioTranscription: {},
+    temperature: 0.3,
+    maxOutputTokens: 1000,
+    speechConfig: {
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
+    },
+    realtimeInputConfig: {
+      activityHandling: ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+      automaticActivityDetection: { silenceDurationMs: TUTOR_SILENCE_DURATION_MS, prefixPaddingMs: 150 },
+    },
+    contextWindowCompression: {
+      triggerTokens: "18000",
+      slidingWindow: { targetTokens: "10000" },
+    },
+    systemInstruction: `Kamu NALAR, teman belajar yang menemani siswa membaca PDF materi.
 Dokumen sesi ini: ${JSON.stringify({ resourceId, fileName })}.
 Siswa belajar, bukan menyerahkan tugas. Bantu siswa memahami satu konsep setiap kali.
 
@@ -43,18 +62,19 @@ PROTOKOL WAJIB:
    sekarang terbuka, panggil get_pdf_context lagi lebih dulu; jika present_pdf_guidance ditolak
    karena tampilan berubah, ambil context baru lalu coba lagi.
    Pesan bertanda PDF_VIEW_STATE adalah pembaruan aplikasi, bukan permintaan berbicara.
-   Jangan berbicara sebelum siswa bertanya.`, [
+   Jangan berbicara sebelum siswa bertanya.`,
+    tools: [{ functionDeclarations: [
       {
         name: "get_pdf_context",
-        type: "function",
+        behavior: Behavior.BLOCKING,
         description: "Wajib pada setiap giliran siswa. Membaca halaman, area terlihat, pilihan, block teks, dan identitas giliran terbaru.",
-        parameters: { type: "object", properties: {}, additionalProperties: false },
+        parametersJsonSchema: { type: "object", properties: {}, additionalProperties: false },
       },
       {
         name: "present_pdf_guidance",
-        type: "function",
+        behavior: Behavior.BLOCKING,
         description: "Menunjuk, menyorot, menggambar atau menulis di halaman aktif sebelum menjelaskan lewat suara. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
-        parameters: {
+        parametersJsonSchema: {
           type: "object", additionalProperties: false,
           required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
           properties: {
@@ -80,5 +100,6 @@ PROTOKOL WAJIB:
           },
         },
       },
-  ], 1000, audioFormat);
+    ] }],
+  };
 }
