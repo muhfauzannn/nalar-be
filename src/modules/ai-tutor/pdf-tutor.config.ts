@@ -5,6 +5,8 @@ import { GEMINI_LIVE_MODEL, TUTOR_PERSONA, TUTOR_SILENCE_DURATION_MS } from "./l
 export const PDF_TUTOR_MODEL = GEMINI_LIVE_MODEL;
 
 export function pdfTutorConfig(resourceId: string, fileName: string): LiveConnectConfig {
+  const holdSeconds = { type: "number", minimum: 1, maximum: 20,
+    description: "Durasi bubble tetap terbaca sebelum boleh berpindah, dalam detik. Tentukan sendiri sesuai panjang caption, kesulitan konsep, dan penjelasan; beri waktu lebih lama untuk contoh atau rumus." };
   const number = { type: "number", minimum: 0, maximum: 1 };
   return {
     responseModalities: [Modality.AUDIO],
@@ -50,6 +52,15 @@ PROTOKOL WAJIB:
    Selesaikan penjelasan pendek satu rujukan sebelum berpindah; jangan menumpuk
    beberapa pemanggilan move_pdf_cursor sekaligus sebelum berbicara.
    move_pdf_cursor tidak menghapus atau mengulang gambar/tulisan sebelumnya.
+   WAJIB tentukan holdSeconds pada setiap pemanggilan visual. Kamu yang menentukan
+   waktunya: pertimbangkan caption, kerumitan konsep, rumus, dan contoh yang perlu
+   dibaca siswa. Jangan gunakan durasi sama untuk semua langkah; catatan panjang
+   atau contoh perlu lebih lama daripada label singkat. Nilai boleh 1–20 detik;
+   label pendek biasanya 3–5 detik, contoh/rumus sekitar 6–12 detik bila diperlukan.
+   Aplikasi menahan bubble sesuai holdSeconds pilihanmu sebelum langkah berikutnya,
+   juga ketika siswa hanya mengetik dan tidak ada audio. Untuk actions dengan caption
+   berbeda, isi holdSeconds per action; jika tidak diisi, caption itu memakai durasi batch.
+   Durasi ini adalah waktu baca setelah goresan/gerakan selesai, bukan kecepatan animasi.
    Salin resourceId, page, revision, turnId PERSIS dari get_pdf_context.
    Utamakan blockId untuk teks agar lokasi presisi. Untuk memblok sebagian kata/kalimat,
    sertakan quote persis dari block, atau startOffset/endOffset (indeks karakter 0-based, akhir eksklusif).
@@ -102,10 +113,11 @@ PROTOKOL WAJIB:
         description: "Memindahkan cursor dan mengganti bubble untuk rujukan yang sedang dijelaskan, tanpa menghapus atau mengulang anotasi. Gunakan lagi saat beralih bagian setelah penjelasan pendek sebelumnya.",
         parametersJsonSchema: {
           type: "object", additionalProperties: false,
-          required: ["resourceId", "page", "revision", "turnId", "caption"],
+          required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds"],
           properties: {
             resourceId: { type: "string" }, page: { type: "integer", minimum: 1 },
             revision: { type: "integer", minimum: 1 }, turnId: { type: "string" },
+            holdSeconds,
             caption: { type: "string", minLength: 1, maxLength: 120 },
             blockId: { type: "string", description: "ID block rujukan; menggantikan x/y." },
             x: number, y: number,
@@ -118,10 +130,11 @@ PROTOKOL WAJIB:
         description: "Menunjuk, menyorot, menggambar atau menulis di halaman aktif sebelum menjelaskan lewat suara. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
         parametersJsonSchema: {
           type: "object", additionalProperties: false,
-          required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
+          required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds", "actions"],
           properties: {
             resourceId: { type: "string" }, page: { type: "integer", minimum: 1 },
             revision: { type: "integer", minimum: 1 }, turnId: { type: "string" },
+            holdSeconds,
             caption: { type: "string", maxLength: 120 },
             actions: {
               type: "array", minItems: 1, maxItems: 8,
@@ -129,6 +142,7 @@ PROTOKOL WAJIB:
                 type: "object", additionalProperties: false, required: ["kind"],
                 properties: {
                   kind: { type: "string", enum: ["point", "highlight", "arrow", "rectangle", "ellipse", "text", "path"] },
+                  holdSeconds,
                   caption: { type: "string", minLength: 1, maxLength: 120, description: "Bubble ketika tindakan ini dikerjakan; menggantikan caption batch." },
                   blockId: { type: "string", description: "ID block dari context untuk target teks, menggantikan x/y/width/height." },
                   quote: { type: "string", minLength: 1, maxLength: 1000, description: "Bagian teks persis dalam blockId yang ingin diblok." },

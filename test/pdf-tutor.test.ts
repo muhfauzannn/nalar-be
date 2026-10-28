@@ -53,8 +53,8 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(instruction).toContain("Pindahkan cursor ketika beralih rujukan");
   const declarations = config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []) ?? [];
   expect(declarations.find((tool) => tool.name === "move_pdf_cursor")?.parametersJsonSchema).toMatchObject({
-    required: ["resourceId", "page", "revision", "turnId", "caption"],
-    properties: { caption: { maxLength: 120 } },
+    required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds"],
+    properties: { caption: { maxLength: 120 }, holdSeconds: { minimum: 1, maximum: 20 } },
   });
   expect(config.thinkingConfig).toBeUndefined();
   expect(config.speechConfig?.languageCode).toBeUndefined();
