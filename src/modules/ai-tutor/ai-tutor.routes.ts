@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 
+import { logEvent, redact } from "../../lib/log";
+import { createRateLimiter } from "../../lib/rate-limit";
 import { requireSession, type AuthVariables } from "../auth/auth.middleware";
 import {
   classifyAiTutorPrompt,
@@ -106,6 +108,57 @@ aiTutorRoutes.post("/conversations/:conversationId/replies", async (context) => 
     201,
   );
 });
+
+// The browser talks to Gemini directly, so a refused or dropped Live socket never reaches this
+// server. The client reports those here so they land in the same logs as our own failures.
+// Log-only on purpose: nothing a student sends may change what other students are allowed to do.
+const sessionEventLimiter = createRateLimiter({ maxEvents: 120, windowMs: 10 * 60 * 1_000 });
+const EVENT_SURFACES = ["pdf", "quiz", "assignment"] as const;
+const EVENT_NAMES = ["connect_failed", "closed", "retry_scheduled", "renewed", "renew_failed", "idle_closed"] as const;
+const EVENT_KINDS = ["quota", "token_expired", "session_limit", "busy", "unavailable", "network", "unknown"] as const;
+
+aiTutorRoutes.post("/session-events", async (context) => {
+  const body = await readObject(context.req.raw);
+  const userId = context.get("session").user.id;
+  const event = parseSessionEvent(body);
+  if (sessionEventLimiter.check(userId).allowed) {
+    sessionEventLimiter.record(userId);
+    const { event: name, ...details } = event;
+    const failed = name === "connect_failed" || name === "closed" || name === "renew_failed";
+    logEvent(failed ? "warn" : "info", "tutor_client_event", { userId, name, ...details });
+  }
+  return context.body(null, 204);
+});
+
+function parseSessionEvent(body: Record<string, unknown>) {
+  const oneOf = <T extends string>(value: unknown, allowed: readonly T[], label: string): T => {
+    if (typeof value !== "string" || !(allowed as readonly string[]).includes(value)) {
+      throw new AiTutorRequestError(`${label} tidak valid.`);
+    }
+    return value as T;
+  };
+  const integer = (value: unknown, label: string, max: number) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > max) {
+      throw new AiTutorRequestError(`${label} tidak valid.`);
+    }
+    return value;
+  };
+  const reason = body.reason;
+  if (reason !== undefined && reason !== null && typeof reason !== "string") {
+    throw new AiTutorRequestError("Alasan tidak valid.");
+  }
+  return {
+    surface: oneOf(body.surface, EVENT_SURFACES, "Permukaan"),
+    event: oneOf(body.event, EVENT_NAMES, "Event"),
+    ...(body.kind === undefined || body.kind === null ? {} : { kind: oneOf(body.kind, EVENT_KINDS, "Jenis") }),
+    ...(body.phase === undefined || body.phase === null ? {} : { phase: oneOf(body.phase, ["connect", "live"] as const, "Fase") }),
+    code: integer(body.code, "Kode", 4999),
+    ageMs: integer(body.ageMs, "Umur sesi", 3_600_000),
+    attempt: integer(body.attempt, "Percobaan", 20),
+    reason: typeof reason === "string" ? redact(reason).replace(/\s+/g, " ").slice(0, 200) : undefined,
+  };
+}
 
 export class AiTutorRequestError extends Error {
   readonly status = 400;

@@ -24,7 +24,7 @@ app.use(
     origin: [...env.trustedOrigins],
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    exposeHeaders: ["Server-Timing"],
+    exposeHeaders: ["Server-Timing", "Retry-After"],
     credentials: true,
     maxAge: 600,
   }),
@@ -56,8 +56,13 @@ app.onError((error, context) => {
     );
   }
   if (error instanceof AiTutorServiceError) {
+    if (error.retryAfterSeconds) context.header("Retry-After", String(error.retryAfterSeconds));
     return context.json(
-      { error: error.message, code: error.code },
+      {
+        error: error.message,
+        code: error.code,
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+      },
       error.status,
     );
   }

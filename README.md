@@ -171,6 +171,13 @@ Konfigurasi memakai `GEMINI_API_KEY` yang sama; analisis refleksi belajar memaka
 Percakapan PDF bersifat sementara di frontend; tutor tugas/kuis tetap memakai
 penyimpanan percakapannya yang ada.
 
+Karena browser tersambung langsung ke Gemini, kegagalan Live tidak melewati server ini. Klien
+melaporkannya ke `POST /api/student/ai-tutor/session-events` (hanya mencatat; kunci dan token
+disamarkan, 120 laporan per akun per 10 menit). Log berbentuk satu JSON per baris:
+`tutor_session_mint_failed` (token gagal dibuat), `tutor_client_event` (penolakan kuota,
+pemutusan, retry, pergantian sesi). Respons sesi memuat `maxSessionSeconds` (batas 10 menit dari
+Google; klien berganti sesi sebelum itu), dan batas per-akun memakai `Retry-After`.
+
 `bun run tutor:smoke` memeriksa token, koneksi Live, pembacaan konteks, tindakan visual,
 dan audio menggunakan materi sintetis. Ini memanggil provider berbayar. Opsional:
 `PDF_TUTOR_SMOKE_IMAGE=/path/to/fixture.jpg bun run tutor:smoke` untuk input visual.
