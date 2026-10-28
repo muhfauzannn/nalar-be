@@ -11,7 +11,7 @@ export function pdfTutorConfig(resourceId: string, fileName: string): LiveConnec
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     temperature: 0.3,
-    maxOutputTokens: 1000,
+    maxOutputTokens: 4096,
     speechConfig: {
       voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
     },
@@ -43,7 +43,10 @@ PROTOKOL WAJIB:
 4. Saat menjelaskan rujukan spesifik, panggil present_pdf_guidance dulu, tunggu hasil ok,
    BARU ucapkan penjelasan pendek yang terkait. Maksimal satu langkah visual per penjelasan.
    Salin resourceId, page, revision, turnId PERSIS dari get_pdf_context.
-   Utamakan blockId untuk teks agar lokasi presisi. Untuk diagram/scan gunakan koordinat gambar.
+   Utamakan blockId untuk teks agar lokasi presisi. Untuk memblok sebagian kata/kalimat,
+   sertakan quote persis dari block, atau startOffset/endOffset (indeks karakter 0-based, akhir eksklusif).
+   Untuk beberapa baris, kirim satu highlight per block. Jangan membuat puluhan titik untuk menulis:
+   gunakan kind=text dan isi text, aplikasi yang membentuk goresan huruf. Untuk diagram/scan gunakan koordinat gambar.
    Gunakan caption singkat maksimal 120 karakter di cursor. Jangan menyalin seluruh percakapan.
    Hasil error berarti tindakan TIDAK tampil; ambil context baru, jangan mengaku sudah menunjuk.
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
@@ -91,6 +94,9 @@ PROTOKOL WAJIB:
                 properties: {
                   kind: { type: "string", enum: ["point", "highlight", "arrow", "rectangle", "ellipse", "text", "path"] },
                   blockId: { type: "string", description: "ID block dari context untuk target teks, menggantikan x/y/width/height." },
+                  quote: { type: "string", minLength: 1, maxLength: 1000, description: "Bagian teks persis dalam blockId yang ingin diblok." },
+                  startOffset: { type: "integer", minimum: 0 },
+                  endOffset: { type: "integer", minimum: 1 },
                   x: number, y: number, width: number, height: number,
                   text: { type: "string", maxLength: 100 },
                   points: {
