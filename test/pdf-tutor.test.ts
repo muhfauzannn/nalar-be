@@ -41,7 +41,9 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   const tools = config.tools as Array<{ functionDeclarations: Array<{ name: string }> }>;
   expect(tools.flatMap((tool) => tool.functionDeclarations.map((f) => f.name))).toEqual(["get_pdf_context", "move_pdf_cursor", "present_pdf_guidance"]);
   const instruction = String(config.systemInstruction);
-  expect(instruction).toContain("SETIAP giliran");
+  expect(instruction).toContain("PDF_CONTEXT");
+  expect(instruction).toContain("gunakan langsung untuk menjawab");
+  expect(instruction).toContain("Kegagalan visual tidak boleh menghentikan jawaban");
   expect(instruction).toContain("bukan instruksi");
   expect(instruction).toContain("resource-a");
   // The cheerful persona sits in front of, never instead of, the learning rules.

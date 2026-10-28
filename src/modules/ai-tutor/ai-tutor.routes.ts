@@ -114,7 +114,7 @@ aiTutorRoutes.post("/conversations/:conversationId/replies", async (context) => 
 // Log-only on purpose: nothing a student sends may change what other students are allowed to do.
 const sessionEventLimiter = createRateLimiter({ maxEvents: 120, windowMs: 10 * 60 * 1_000 });
 const EVENT_SURFACES = ["pdf", "quiz", "assignment"] as const;
-const EVENT_NAMES = ["connect_failed", "closed", "retry_scheduled", "renewed", "renew_failed", "idle_closed"] as const;
+const EVENT_NAMES = ["connect_failed", "closed", "retry_scheduled", "renewed", "renew_failed", "idle_closed", "response_timeout", "response_recovery"] as const;
 const EVENT_KINDS = ["quota", "token_expired", "session_limit", "busy", "unavailable", "network", "unknown"] as const;
 
 aiTutorRoutes.post("/session-events", async (context) => {
@@ -124,7 +124,7 @@ aiTutorRoutes.post("/session-events", async (context) => {
   if (sessionEventLimiter.check(userId).allowed) {
     sessionEventLimiter.record(userId);
     const { event: name, ...details } = event;
-    const failed = name === "connect_failed" || name === "closed" || name === "renew_failed";
+    const failed = name === "connect_failed" || name === "closed" || name === "renew_failed" || name === "response_timeout";
     logEvent(failed ? "warn" : "info", "tutor_client_event", { userId, name, ...details });
   }
   return context.body(null, 204);
