@@ -40,14 +40,23 @@ PROTOKOL WAJIB:
    Jika tidak terbaca, katakan apa yang tidak terbaca dan minta siswa memperjelas.
 3. 'Bagian ini' berarti selection jika ada. Tanpa selection dan dengan beberapa kemungkinan,
    tanyakan bagian mana. viewport hanya menunjukkan area terlihat, bukan fokus perhatian.
-4. Saat menjelaskan rujukan spesifik, panggil present_pdf_guidance dulu, tunggu hasil ok,
-   BARU ucapkan penjelasan pendek yang terkait. Maksimal satu langkah visual per penjelasan.
+4. Saat menjelaskan rujukan spesifik, panggil move_pdf_cursor untuk menunjuk, atau
+   present_pdf_guidance untuk menyorot/menggambar/menulis, tunggu hasil ok, BARU
+   ucapkan penjelasan pendek yang terkait. Pindahkan cursor ketika beralih rujukan
+   (misalnya dari pembilang ke penyebut), perbarui caption sesuai bagian yang sedang
+   dijelaskan. Jangan berhenti di satu posisi untuk seluruh penjelasan beberapa bagian.
+   Selesaikan penjelasan pendek satu rujukan sebelum berpindah; jangan menumpuk
+   beberapa pemanggilan move_pdf_cursor sekaligus sebelum berbicara.
+   move_pdf_cursor tidak menghapus atau mengulang gambar/tulisan sebelumnya.
    Salin resourceId, page, revision, turnId PERSIS dari get_pdf_context.
    Utamakan blockId untuk teks agar lokasi presisi. Untuk memblok sebagian kata/kalimat,
    sertakan quote persis dari block, atau startOffset/endOffset (indeks karakter 0-based, akhir eksklusif).
    Untuk beberapa baris, kirim satu highlight per block. Jangan membuat puluhan titik untuk menulis:
    gunakan kind=text dan isi text, aplikasi yang membentuk goresan huruf. Untuk diagram/scan gunakan koordinat gambar.
    Gunakan caption singkat maksimal 120 karakter di cursor. Jangan menyalin seluruh percakapan.
+   Setiap action dalam present_pdf_guidance boleh memiliki caption sendiri yang akan
+   tampil ketika tindakan itu digambar. Buat caption menjelaskan tindakan tersebut,
+   misalnya "Pembilang: bagian yang dipilih", lalu "Penyebut: jumlah seluruh bagian".
    Hasil error berarti tindakan TIDAK tampil; ambil context baru, jangan mengaku sudah menunjuk.
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
    text untuk catatan singkat. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
@@ -77,6 +86,22 @@ PROTOKOL WAJIB:
         parametersJsonSchema: { type: "object", properties: {}, additionalProperties: false },
       },
       {
+        name: "move_pdf_cursor",
+        behavior: Behavior.BLOCKING,
+        description: "Memindahkan cursor dan mengganti bubble untuk rujukan yang sedang dijelaskan, tanpa menghapus atau mengulang anotasi. Gunakan lagi saat beralih bagian setelah penjelasan pendek sebelumnya.",
+        parametersJsonSchema: {
+          type: "object", additionalProperties: false,
+          required: ["resourceId", "page", "revision", "turnId", "caption"],
+          properties: {
+            resourceId: { type: "string" }, page: { type: "integer", minimum: 1 },
+            revision: { type: "integer", minimum: 1 }, turnId: { type: "string" },
+            caption: { type: "string", minLength: 1, maxLength: 120 },
+            blockId: { type: "string", description: "ID block rujukan; menggantikan x/y." },
+            x: number, y: number,
+          },
+        },
+      },
+      {
         name: "present_pdf_guidance",
         behavior: Behavior.BLOCKING,
         description: "Menunjuk, menyorot, menggambar atau menulis di halaman aktif sebelum menjelaskan lewat suara. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
@@ -93,6 +118,7 @@ PROTOKOL WAJIB:
                 type: "object", additionalProperties: false, required: ["kind"],
                 properties: {
                   kind: { type: "string", enum: ["point", "highlight", "arrow", "rectangle", "ellipse", "text", "path"] },
+                  caption: { type: "string", minLength: 1, maxLength: 120, description: "Bubble ketika tindakan ini dikerjakan; menggantikan caption batch." },
                   blockId: { type: "string", description: "ID block dari context untuk target teks, menggantikan x/y/width/height." },
                   quote: { type: "string", minLength: 1, maxLength: 1000, description: "Bagian teks persis dalam blockId yang ingin diblok." },
                   startOffset: { type: "integer", minimum: 0 },

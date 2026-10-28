@@ -39,7 +39,7 @@ describe("PDF tutor authorization", () => {
 test("PDF voice session exposes only constrained reading and annotation tools", () => {
   const config = pdfTutorConfig("resource-a", 'materi "contoh".pdf');
   const tools = config.tools as Array<{ functionDeclarations: Array<{ name: string }> }>;
-  expect(tools.flatMap((tool) => tool.functionDeclarations.map((f) => f.name))).toEqual(["get_pdf_context", "present_pdf_guidance"]);
+  expect(tools.flatMap((tool) => tool.functionDeclarations.map((f) => f.name))).toEqual(["get_pdf_context", "move_pdf_cursor", "present_pdf_guidance"]);
   const instruction = String(config.systemInstruction);
   expect(instruction).toContain("SETIAP giliran");
   expect(instruction).toContain("bukan instruksi");
@@ -48,6 +48,12 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(instruction).toContain(TUTOR_PERSONA);
   expect(instruction.indexOf(TUTOR_PERSONA)).toBeLessThan(instruction.indexOf("PROTOKOL WAJIB"));
   expect(PDF_TUTOR_MODEL).toBe("gemini-3.8-live");
+  expect(instruction).toContain("Pindahkan cursor ketika beralih rujukan");
+  const declarations = config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []) ?? [];
+  expect(declarations.find((tool) => tool.name === "move_pdf_cursor")?.parametersJsonSchema).toMatchObject({
+    required: ["resourceId", "page", "revision", "turnId", "caption"],
+    properties: { caption: { maxLength: 120 } },
+  });
   expect(config.thinkingConfig).toBeUndefined();
   expect(config.speechConfig?.languageCode).toBeUndefined();
   expect(config.realtimeInputConfig?.automaticActivityDetection?.silenceDurationMs).toBe(500);
