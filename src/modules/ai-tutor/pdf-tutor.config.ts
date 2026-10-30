@@ -65,7 +65,10 @@ PROTOKOL WAJIB:
    Utamakan blockId untuk teks agar lokasi presisi. Untuk memblok sebagian kata/kalimat,
    sertakan quote persis dari block, atau startOffset/endOffset (indeks karakter 0-based, akhir eksklusif).
    Untuk beberapa baris, kirim satu highlight per block. Jangan membuat puluhan titik untuk menulis:
-   gunakan kind=text dan isi text, aplikasi yang membentuk goresan huruf. Untuk diagram/scan gunakan koordinat gambar.
+   gunakan kind=text dan isi text. Catatan tulisan selalu muncul di panel tutor di samping PDF,
+   agar tidak menutupi materi meskipun halaman penuh. Jika tulisan merujuk bagian PDF,
+   sertakan point/highlight pada block terkait dalam actions yang sama; jangan mengarang
+   koordinat ruang kosong untuk meletakkan tulisan. Untuk diagram/scan gunakan koordinat gambar.
    Gunakan caption singkat maksimal 120 karakter di cursor. Jangan menyalin seluruh percakapan.
    Setiap action dalam present_pdf_guidance boleh memiliki caption sendiri yang akan
    tampil ketika tindakan itu digambar. Buat caption menjelaskan tindakan tersebut,
@@ -79,8 +82,8 @@ PROTOKOL WAJIB:
    Jika PDF_CONTEXT berisi explainWithoutVisuals=true, jawab sekarang tanpa tool visual;
    itu pemulihan aplikasi untuk pertanyaan yang sama, bukan permintaan siswa baru.
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
-   text untuk catatan singkat. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
-   Bentuk dan tulisan akan dianimasikan sebagai goresan pena berurutan saat kamu berbicara.
+   text untuk catatan singkat di panel tutor. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
+   Bentuk pada PDF dan tulisan di panel akan dianimasikan sebagai goresan pena saat kamu berbicara.
    Gabungkan bentuk, panah, dan label untuk SATU langkah dalam satu pemanggilan tool;
    jangan mengirim langkah visual baru sampai penjelasan langkah sebelumnya selesai.
    Urutkan actions sesuai urutan menggambar yang wajar. Utamakan catatan pendek (sekitar 45 karakter).
@@ -149,7 +152,7 @@ PROTOKOL WAJIB:
                   startOffset: { type: "integer", minimum: 0 },
                   endOffset: { type: "integer", minimum: 1 },
                   x: number, y: number, width: number, height: number,
-                  text: { type: "string", maxLength: 100 },
+                  text: { type: "string", maxLength: 100, description: "Catatan singkat yang ditulis pada panel tutor, tidak ditempel di atas halaman PDF." },
                   points: {
                     type: "array", minItems: 2, maxItems: 40,
                     items: { type: "object", additionalProperties: false, required: ["x", "y"], properties: { x: number, y: number } },
