@@ -101,9 +101,9 @@ describe("client session events", () => {
     expect(reply.status).toBe(204);
   });
 
-  test("response timeout and recovery events are accepted without logging question content", async () => {
+  test("response timeout, recovery and empty response events are accepted without logging question content", async () => {
     const student = await newUser("event-response");
-    for (const event of ["response_timeout", "response_recovery"]) {
+    for (const event of ["response_timeout", "response_recovery", "empty_response"]) {
       const reply = await api(student, "POST", "/api/student/ai-tutor/session-events", {
         surface: "pdf", event, phase: "live", attempt: 1,
         reason: "text-sent, tool-requested, context-read, tool-response-sent",
@@ -112,6 +112,8 @@ describe("client session events", () => {
     }
     const timeout = lines.find(({ line }) => line.includes('"name":"response_timeout"'));
     expect(timeout?.level).toBe("warn");
+    const empty = lines.find(({ line }) => line.includes('"name":"empty_response"'));
+    expect(empty?.level).toBe("warn");
   });
 
   test("a failure report is logged as a warning, redacted and trimmed to known fields", async () => {
