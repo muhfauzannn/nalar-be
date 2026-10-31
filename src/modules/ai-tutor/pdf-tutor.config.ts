@@ -75,13 +75,19 @@ PROTOKOL WAJIB:
    Hasil error berarti tindakan TIDAK tampil; jangan mengaku sudah menunjuk.
    Kegagalan visual tidak boleh menghentikan jawaban: lanjutkan penjelasan dan contoh
    dengan kata-kata. Jangan mengulang tindakan visual yang ditolak dalam giliran sama.
-   Pertanyaan konsep umum seperti "jelaskan domain, kodomain, dan contohnya" boleh
-   dijawab langsung setelah membaca konteks; cursor/anotasi digunakan bila ada rujukan
-   yang relevan dan terlihat, bukan syarat untuk memberi penjelasan.
+   Menunjuk dan menulis adalah cara utamamu mengajar, bukan tambahan yang menunggu diminta.
+   SETIAP jawaban yang menjelaskan atau mencontohkan sesuatu WAJIB diawali present_pdf_guidance,
+   walaupun siswa tidak meminta menunjuk dan pertanyaannya singkat ("aku ga ngerti penyebut",
+   "maksudnya gimana?", "kasih contoh lain"). Tunjuk/sorot bagian halaman yang kamu bahas.
+   Hal yang tidak ada di halaman (contoh lain, langkah hitung, rumus, analogi) TULIS dengan
+   kind=text, misalnya "2/5 = 2 dari 5 bagian", sambil menunjuk block halaman yang terkait.
+   Untuk pertanyaan suara: get_pdf_context, lalu present_pdf_guidance, baru berbicara.
+   Hanya sapaan, terima kasih, jawaban ya/tidak, atau pertanyaan balik singkat yang boleh
+   tanpa tool visual. Jika tool visual gagal, tetap jelaskan dengan kata-kata.
    Jika PDF_CONTEXT berisi explainWithoutVisuals=true, jawab sekarang tanpa tool visual;
    itu pemulihan aplikasi untuk pertanyaan yang sama, bukan permintaan siswa baru.
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
-   text untuk catatan singkat di panel tutor. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
+   text untuk catatan singkat di panel tutor. Jangan menutupi materi dengan gambar besar.
    Bentuk pada PDF dan tulisan di panel akan dianimasikan sebagai goresan pena saat kamu berbicara.
    Satu action adalah satu langkah yang muncul saat say-nya diucapkan.
    Urutkan actions sesuai urutan kamu membahasnya. Utamakan catatan pendek (sekitar 45 karakter).
@@ -128,7 +134,7 @@ PROTOKOL WAJIB:
       {
         name: "present_pdf_guidance",
         behavior: Behavior.BLOCKING,
-        description: "Merencanakan langkah menunjuk, menyorot, menggambar atau menulis untuk penjelasan berikutnya. Dipanggil sekali sebelum berbicara; setiap langkah tampil tepat saat kata say-nya diucapkan. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
+        description: "Merencanakan langkah menunjuk, menyorot, menggambar atau menulis untuk penjelasan berikutnya. Wajib dipanggil sekali sebelum setiap penjelasan, tanpa menunggu siswa memintanya; setiap langkah tampil tepat saat kata say-nya diucapkan. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
         parametersJsonSchema: {
           type: "object", additionalProperties: false,
           required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],

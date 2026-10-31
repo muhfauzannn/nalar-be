@@ -53,6 +53,9 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   // Pointing is planned up front, each step tied to the words that release it.
   expect(instruction).toContain("TEPAT saat kamu menyebutnya");
   expect(instruction).toContain("ucapkan kata-kata say itu apa adanya");
+  // Pointing and writing are the default way to explain, not something the student must ask for.
+  expect(instruction).toContain("WAJIB diawali present_pdf_guidance");
+  expect(instruction).not.toContain("bukan syarat untuk memberi penjelasan");
   const declarations = config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []) ?? [];
   expect(declarations.find((tool) => tool.name === "present_pdf_guidance")?.parametersJsonSchema).toMatchObject({
     required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
