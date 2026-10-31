@@ -50,8 +50,14 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(instruction).toContain(TUTOR_PERSONA);
   expect(instruction.indexOf(TUTOR_PERSONA)).toBeLessThan(instruction.indexOf("PROTOKOL WAJIB"));
   expect(PDF_TUTOR_MODEL).toBe("gemini-3.8-live");
-  expect(instruction).toContain("Pindahkan cursor ketika beralih rujukan");
+  // Pointing is planned up front, each step tied to the words that release it.
+  expect(instruction).toContain("TEPAT saat kamu menyebutnya");
+  expect(instruction).toContain("ucapkan kata-kata say itu apa adanya");
   const declarations = config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []) ?? [];
+  expect(declarations.find((tool) => tool.name === "present_pdf_guidance")?.parametersJsonSchema).toMatchObject({
+    required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
+    properties: { actions: { items: { required: ["kind", "say"], properties: { say: { minLength: 3, maxLength: 80 } } } } },
+  });
   expect(declarations.find((tool) => tool.name === "move_pdf_cursor")?.parametersJsonSchema).toMatchObject({
     required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds"],
     properties: { caption: { maxLength: 120 }, holdSeconds: { minimum: 1, maximum: 20 } },

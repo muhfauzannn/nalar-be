@@ -44,23 +44,22 @@ PROTOKOL WAJIB:
    Jika tidak terbaca, katakan apa yang tidak terbaca dan minta siswa memperjelas.
 3. 'Bagian ini' berarti selection jika ada. Tanpa selection dan dengan beberapa kemungkinan,
    tanyakan bagian mana. viewport hanya menunjukkan area terlihat, bukan fokus perhatian.
-4. Saat menjelaskan rujukan spesifik, panggil move_pdf_cursor untuk menunjuk, atau
-   present_pdf_guidance untuk menyorot/menggambar/menulis, tunggu hasil ok, BARU
-   ucapkan penjelasan pendek yang terkait. Pindahkan cursor ketika beralih rujukan
-   (misalnya dari pembilang ke penyebut), perbarui caption sesuai bagian yang sedang
-   dijelaskan. Jangan berhenti di satu posisi untuk seluruh penjelasan beberapa bagian.
-   Selesaikan penjelasan pendek satu rujukan sebelum berpindah; jangan menumpuk
-   beberapa pemanggilan move_pdf_cursor sekaligus sebelum berbicara.
-   move_pdf_cursor tidak menghapus atau mengulang gambar/tulisan sebelumnya.
-   WAJIB tentukan holdSeconds pada setiap pemanggilan visual. Kamu yang menentukan
-   waktunya: pertimbangkan caption, kerumitan konsep, rumus, dan contoh yang perlu
-   dibaca siswa. Jangan gunakan durasi sama untuk semua langkah; catatan panjang
-   atau contoh perlu lebih lama daripada label singkat. Nilai boleh 1–20 detik;
-   label pendek biasanya 3–5 detik, contoh/rumus sekitar 6–12 detik bila diperlukan.
-   Aplikasi menahan bubble sesuai holdSeconds pilihanmu sebelum langkah berikutnya,
-   juga ketika siswa hanya mengetik dan tidak ada audio. Untuk actions dengan caption
-   berbeda, isi holdSeconds per action; jika tidak diisi, caption itu memakai durasi batch.
-   Durasi ini adalah waktu baca setelah goresan/gerakan selesai, bukan kecepatan animasi.
+4. Menunjuklah seperti guru di depan papan: tunjuk bagian PDF TEPAT saat kamu menyebutnya,
+   lalu pindah ketika kamu beralih ke bagian lain (misalnya dari pembilang ke penyebut).
+   Caranya: SEBELUM mulai berbicara, panggil present_pdf_guidance SEKALI berisi semua
+   langkah penjelasanmu secara berurutan (biasanya 2–5 actions, satu action per bagian
+   yang kamu bahas). Setiap action WAJIB punya say: 2–5 kata pertama PERSIS yang akan
+   kamu ucapkan ketika mulai membahas bagian itu, dan caption singkat untuk bagian itu.
+   Setelah hasil ok, ucapkan penjelasanmu dengan urutan yang sama dan benar-benar
+   ucapkan kata-kata say itu apa adanya, dengan kata-kata biasa (tulis angka seperti
+   diucapkan, misalnya "tiga per empat"). Aplikasi menggerakkan penunjuk dan menggambar
+   setiap langkah tepat saat kata say terdengar, lalu menahannya sampai langkah berikutnya,
+   jadi holdSeconds tidak perlu diisi. Bagian yang tidak ada di halaman (analogi atau
+   contoh buatanmu) tidak perlu action, kecuali catatan text yang ingin kamu tuliskan.
+   Jangan memanggil tool visual lagi di tengah penjelasan yang sama.
+   move_pdf_cursor hanya untuk menunjuk satu hal singkat tanpa penjelasan panjang,
+   misalnya menjawab "yang mana?"; untuk itu WAJIB isi holdSeconds (1–20 detik, waktu
+   baca bubble). move_pdf_cursor tidak menghapus atau mengulang gambar/tulisan sebelumnya.
    Salin resourceId, page, revision, turnId PERSIS dari get_pdf_context.
    Utamakan blockId untuk teks agar lokasi presisi. Untuk memblok sebagian kata/kalimat,
    sertakan quote persis dari block, atau startOffset/endOffset (indeks karakter 0-based, akhir eksklusif).
@@ -84,9 +83,8 @@ PROTOKOL WAJIB:
 5. Pilih point/highlight untuk rujukan, arrow/rectangle/ellipse/path untuk hubungan,
    text untuk catatan singkat di panel tutor. Jangan menutupi materi dengan gambar besar. Gambar hanya bila membantu.
    Bentuk pada PDF dan tulisan di panel akan dianimasikan sebagai goresan pena saat kamu berbicara.
-   Gabungkan bentuk, panah, dan label untuk SATU langkah dalam satu pemanggilan tool;
-   jangan mengirim langkah visual baru sampai penjelasan langkah sebelumnya selesai.
-   Urutkan actions sesuai urutan menggambar yang wajar. Utamakan catatan pendek (sekitar 45 karakter).
+   Satu action adalah satu langkah yang muncul saat say-nya diucapkan.
+   Urutkan actions sesuai urutan kamu membahasnya. Utamakan catatan pendek (sekitar 45 karakter).
    Tulis label sebagai teks biasa, misalnya "L = p × l", tanpa Markdown atau sintaks LaTeX.
    text/diagram tambahan harus disebut sebagai contoh atau ilustrasi buatanmu, bukan isi PDF.
 6. Setelah menjelaskan, ajukan satu pertanyaan penerapan atau minta siswa menjelaskan kembali.
@@ -113,7 +111,7 @@ PROTOKOL WAJIB:
       {
         name: "move_pdf_cursor",
         behavior: Behavior.BLOCKING,
-        description: "Memindahkan cursor dan mengganti bubble untuk rujukan yang sedang dijelaskan, tanpa menghapus atau mengulang anotasi. Gunakan lagi saat beralih bagian setelah penjelasan pendek sebelumnya.",
+        description: "Menunjuk satu hal singkat tanpa penjelasan panjang (misalnya menjawab \"yang mana?\"), tanpa menghapus atau mengulang anotasi. Untuk penjelasan, rencanakan langkahnya dengan present_pdf_guidance.",
         parametersJsonSchema: {
           type: "object", additionalProperties: false,
           required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds"],
@@ -130,10 +128,10 @@ PROTOKOL WAJIB:
       {
         name: "present_pdf_guidance",
         behavior: Behavior.BLOCKING,
-        description: "Menunjuk, menyorot, menggambar atau menulis di halaman aktif sebelum menjelaskan lewat suara. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
+        description: "Merencanakan langkah menunjuk, menyorot, menggambar atau menulis untuk penjelasan berikutnya. Dipanggil sekali sebelum berbicara; setiap langkah tampil tepat saat kata say-nya diucapkan. Tindakan ditolak jika konteks/giliran kedaluwarsa.",
         parametersJsonSchema: {
           type: "object", additionalProperties: false,
-          required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds", "actions"],
+          required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
           properties: {
             resourceId: { type: "string" }, page: { type: "integer", minimum: 1 },
             revision: { type: "integer", minimum: 1 }, turnId: { type: "string" },
@@ -142,9 +140,10 @@ PROTOKOL WAJIB:
             actions: {
               type: "array", minItems: 1, maxItems: 8,
               items: {
-                type: "object", additionalProperties: false, required: ["kind"],
+                type: "object", additionalProperties: false, required: ["kind", "say"],
                 properties: {
                   kind: { type: "string", enum: ["point", "highlight", "arrow", "rectangle", "ellipse", "text", "path"] },
+                  say: { type: "string", minLength: 3, maxLength: 80, description: "2–5 kata pertama PERSIS yang akan kamu ucapkan saat mulai membahas langkah ini. Langkah tampil ketika kata ini terdengar." },
                   holdSeconds,
                   caption: { type: "string", minLength: 1, maxLength: 120, description: "Bubble ketika tindakan ini dikerjakan; menggantikan caption batch." },
                   blockId: { type: "string", description: "ID block dari context untuk target teks, menggantikan x/y/width/height." },
