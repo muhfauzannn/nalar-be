@@ -18,7 +18,9 @@ export type AuthoringErrorCode =
   | "ASSIGNMENT_NOT_READY"
   | "SCENARIO_NOT_FOUND"
   | "SUBJECT_NOT_FOUND"
-  | "MODULE_NOT_IN_COURSE";
+  | "MODULE_NOT_IN_COURSE"
+  | "LAB_NOT_FOUND"
+  | "LAB_IN_USE";
 
 export class AuthoringServiceError extends Error {
   constructor(

@@ -1,3 +1,5 @@
+import { listLessonLabs } from "../labs/labs.repository";
+import { labCatalog } from "../labs/labs.service";
 import { generateJoinCode } from "../../lib/join-code";
 import { fileStorage, newResourceKey, removeQuietly } from "../../lib/file-storage";
 import { formatBytes, USER_PDF_BYTES_LIMIT } from "../../lib/pdf-upload";
@@ -230,7 +232,7 @@ export async function getMyLesson(userId: string, lessonId: string) {
   if (!(await findTeacherLesson(userId, lessonId))) throw notFound();
   const editor = await getLessonEditor(lessonId);
   if (!editor) throw notFound();
-  return editor;
+  return { ...editor, labs: await listLessonLabs(lessonId), labCatalog: labCatalog() };
 }
 
 export async function editLesson(

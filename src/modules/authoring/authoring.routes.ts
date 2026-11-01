@@ -4,7 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import { fileResponse } from "../../lib/file-response";
 import { formatBytes, MAX_PDF_BYTES } from "../../lib/pdf-upload";
 import { requireSession, type AuthVariables } from "../auth/auth.middleware";
-import { readForm, readObject, uuid } from "./authoring.shared";
+import { AuthoringRequestError, readForm, readObject, uuid } from "./authoring.shared";
 import {
   parseAssignmentPatch,
   parseCoursePatch,
@@ -24,6 +24,7 @@ import {
   parseResourceUpload,
 } from "./authoring.parsers";
 import { getAssignmentAnalytics, getSubmissionProcess } from "./analytics.service";
+import { attachLab, detachLab, labCatalog } from "../labs/labs.service";
 import {
   copyMyAssignment,
   createMyAssignment,
@@ -236,6 +237,23 @@ authoringRoutes.get("/resources/:resourceId/file", async (context) =>
 
 authoringRoutes.delete("/resources/:resourceId", async (context) =>
   context.json(await removeResource(me(context), param(context, "resourceId", "ID resource"))),
+);
+
+// ---- labs -----------------------------------------------------------------
+
+authoringRoutes.get("/labs", (context) => context.json({ labs: labCatalog() }));
+
+authoringRoutes.post("/lessons/:lessonId/labs", async (context) => {
+  const body = await readObject(context.req.raw);
+  if (typeof body.labKey !== "string") throw new AuthoringRequestError("Pilih lab dari katalog.");
+  return context.json(
+    await attachLab(me(context), param(context, "lessonId", "ID lesson"), body.labKey),
+    201,
+  );
+});
+
+authoringRoutes.delete("/labs/:labId", async (context) =>
+  context.json(await detachLab(me(context), param(context, "labId", "ID lab"))),
 );
 
 // ---- quizzes ------------------------------------------------------------

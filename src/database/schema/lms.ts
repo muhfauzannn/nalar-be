@@ -960,3 +960,44 @@ export const processPointEvent = pgTable(
     check("process_point_event_points_check", sql`${table.points} between 1 and 50`),
   ],
 );
+
+// Interactive labs (PRD §5.10) are built by the Bernalar team and kept in a
+// catalog in code (src/modules/labs/lab-catalog.ts); a teacher only attaches
+// one to a lesson. `lab_key` names the catalog entry.
+export const lessonLab = pgTable(
+  "lesson_lab",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lesson.id),
+    labKey: text("lab_key").notNull(),
+    ...timestamps,
+  },
+  (table) => [unique("lesson_lab_lesson_key_unique").on(table.lessonId, table.labKey)],
+);
+
+// A lab challenge a student solved, once per challenge. Labs are for
+// understanding, never graded; each solved challenge is a small Poin Nalar.
+export const labChallengeCompletion = pgTable(
+  "lab_challenge_completion",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    lessonLabId: uuid("lesson_lab_id")
+      .notNull()
+      .references(() => lessonLab.id),
+    studentCourseMembershipId: uuid("student_course_membership_id")
+      .notNull()
+      .references(() => courseMembership.id),
+    challenge: text("challenge").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("lab_challenge_completion_unique").on(
+      table.lessonLabId,
+      table.studentCourseMembershipId,
+      table.challenge,
+    ),
+    index("lab_challenge_completion_membership_idx").on(table.studentCourseMembershipId),
+  ],
+);

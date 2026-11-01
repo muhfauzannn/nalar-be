@@ -1,3 +1,5 @@
+import { findLab, LAB_CHALLENGE_POINTS } from "../labs/lab-catalog";
+import { listCourseLabs, listLabCompletions } from "../labs/labs.repository";
 import { findStudentCourse, listStudentCourseRows } from "../student/student.repository";
 import {
   findPointInputs,
@@ -122,9 +124,11 @@ export async function getCourseIsland(userId: string, courseId: string) {
   // Backfill: work done before the ledger existed earns its points too.
   await Promise.all([...mine.values()].map((row) => awardSubmissionPoints(row.id)));
 
-  const [states, events] = await Promise.all([
+  const [states, events, labs, solved] = await Promise.all([
     listStageStates([...mine.values()].map((row) => row.id)),
     listPointEvents([membershipId]),
+    listCourseLabs(courseId),
+    listLabCompletions([membershipId]),
   ]);
 
   const buildings = assignments.map((item) => {
@@ -165,9 +169,18 @@ export async function getCourseIsland(userId: string, courseId: string) {
 
   const { total, byKind } = tally(events);
   const own = visible.filter((row) => row.membershipId === membershipId);
+  const labIds = new Set(labs.map((lab) => lab.id));
+  const labSolved = solved.filter((row) => labIds.has(row.lessonLabId));
   return {
     course: { id: courseRow.id, name: courseRow.name, subjectName: courseRow.subjectName },
-    points: { total },
+    points: { total: total + labSolved.length * LAB_CHALLENGE_POINTS },
+    labs: labs.map((lab) => ({
+      id: lab.id,
+      lessonId: lab.lessonId,
+      labKey: lab.labKey,
+      solved: labSolved.filter((row) => row.lessonLabId === lab.id).length,
+      challenges: findLab(lab.labKey)?.challenges.length ?? 0,
+    })),
     badges: badgesFrom(byKind, comebacks(journeysOf(own, events))),
     bridge: { planks, total: classIds.length * assignments.length, students: classIds.length },
     buildings,
@@ -183,11 +196,15 @@ export async function getStudentProgress(userId: string) {
   const submissions = await listMembershipSubmissions(ids);
   const latest = latestBy(submissions, (row) => `${row.membershipId}:${row.assignmentId}`);
   await Promise.all([...latest.values()].map((row) => awardSubmissionPoints(row.id)));
-  const [events, completions] = await Promise.all([
+  const [events, completions, solved] = await Promise.all([
     listPointEvents(ids),
     listStageCompletions(submissions.map((row) => row.id)),
+    listLabCompletions(ids),
   ]);
-  const { total, byKind } = tally(events);
+  const tallied = tally(events);
+  const { byKind } = tallied;
+  // Solved lab challenges add a small, fixed amount each (lab-catalog.ts).
+  const total = tallied.total + solved.length * LAB_CHALLENGE_POINTS;
   const now = new Date();
   const completedAt = completions.flatMap((row) => (row.completedAt ? [row.completedAt] : []));
   return {

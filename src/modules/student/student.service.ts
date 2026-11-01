@@ -1,5 +1,6 @@
 import type { AuthSession } from "../auth/auth";
 import { awardSubmissionPointsSafely } from "../gamification/gamification.service";
+import { listLabCompletions, listLessonLabs } from "../labs/labs.repository";
 import { normalizeShortAnswer, quizDefinitionsAreReady } from "../../lib/quiz-readiness";
 import {
   generateQuizReflection,
@@ -300,7 +301,17 @@ export async function getStudentCourse(userId: string, courseId: string) {
 export async function getStudentLesson(userId: string, lessonId: string) {
   const lessonRow = await findStudentLesson(lessonId, userId);
   if (!lessonRow) throw new StudentServiceError(404, "Materi tidak ditemukan.");
-  return lessonRow;
+  const [labs, solved] = await Promise.all([
+    listLessonLabs(lessonId),
+    listLabCompletions([lessonRow.enrollmentId]),
+  ]);
+  return {
+    ...lessonRow,
+    labs: labs.map((lab) => ({
+      ...lab,
+      solved: solved.filter((row) => row.lessonLabId === lab.id).map((row) => row.challenge),
+    })),
+  };
 }
 
 export async function getStudentResourceFile(userId: string, resourceId: string) {

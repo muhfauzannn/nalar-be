@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { fileResponse } from "../../lib/file-response";
 import { getCourseIsland, getStudentProgress, getStudentWorld } from "../gamification/gamification.service";
+import { completeLabChallenge } from "../labs/labs.service";
 import { requireSession, type StudentVariables } from "./student.auth";
 import { workflowStages, type WorkflowStage, type WritingSignalInput } from "./student.repository";
 import {
@@ -66,6 +67,14 @@ studentRoutes.get("/points", async (context) =>
 studentRoutes.get("/world", async (context) =>
   context.json(await getStudentWorld(context.get("session").user.id)),
 );
+
+studentRoutes.post("/labs/:labId/challenges/:challenge", async (context) => {
+  const challenge = context.req.param("challenge");
+  if (!/^[a-z0-9-]{1,40}$/.test(challenge)) throw new RequestValidationError("Tantangan lab tidak valid.");
+  return context.json(
+    await completeLabChallenge(context.get("session").user.id, requiredId(context.req.param("labId")), challenge),
+  );
+});
 
 studentRoutes.get("/lessons/:lessonId", async (context) =>
   context.json(
