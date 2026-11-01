@@ -15,6 +15,7 @@ import {
   rubricCriterion,
   scenario,
   subject,
+  lessonLab,
 } from "../../database/schema";
 import {
   assertBelowLimit,
@@ -355,6 +356,12 @@ export async function getCourseEditor(courseId: string) {
           .orderBy(asc(learningResource.position))
       ).map(publicResource)
     : [];
+  const labs = lessonIds.length
+    ? await db
+        .select({ id: lessonLab.id, lessonId: lessonLab.lessonId, labKey: lessonLab.labKey })
+        .from(lessonLab)
+        .where(inArray(lessonLab.lessonId, lessonIds))
+    : [];
 
   const [quizzes, assignments, studentRows] = await Promise.all([
     db
@@ -406,6 +413,9 @@ export async function getCourseEditor(courseId: string) {
         .map((lessonRow) => ({
           ...lessonRow,
           resources: resources.filter((resource) => resource.lessonId === lessonRow.id),
+          labs: labs
+            .filter((lab) => lab.lessonId === lessonRow.id)
+            .map((lab) => ({ id: lab.id, labKey: lab.labKey })),
         })),
     })),
     quizzes,
