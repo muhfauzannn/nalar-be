@@ -146,11 +146,16 @@ export const BADGES = [
   { id: "tekun", kind: "substantial_revision", count: 3 },
 ] as const satisfies ReadonlyArray<{ id: string; kind: ProcessPointKind; count: number }>;
 
-export function badgesFrom(counts: Partial<Record<ProcessPointKind, number>>) {
-  return BADGES.map((badge) => ({
-    id: badge.id,
-    progress: Math.min(badge.count, counts[badge.kind] ?? 0),
-    target: badge.count,
-    earned: (counts[badge.kind] ?? 0) >= badge.count,
-  }));
+// `comebacks` counts finished assignments that earned a kind of point the one
+// before them missed (see progression.ts); it backs the "Bangkit" badge.
+export function badgesFrom(counts: Partial<Record<ProcessPointKind, number>>, comebacks = 0) {
+  return [
+    ...BADGES.map((badge) => ({
+      id: badge.id,
+      progress: Math.min(badge.count, counts[badge.kind] ?? 0),
+      target: badge.count,
+      earned: (counts[badge.kind] ?? 0) >= badge.count,
+    })),
+    { id: "bangkit" as const, progress: Math.min(1, comebacks), target: 1, earned: comebacks >= 1 },
+  ];
 }

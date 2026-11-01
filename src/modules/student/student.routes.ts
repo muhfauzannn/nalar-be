@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { fileResponse } from "../../lib/file-response";
-import { getCourseIsland, getStudentPoints } from "../gamification/gamification.service";
+import { getCourseIsland, getStudentProgress, getStudentWorld } from "../gamification/gamification.service";
 import { requireSession, type StudentVariables } from "./student.auth";
 import { workflowStages, type WorkflowStage, type WritingSignalInput } from "./student.repository";
 import {
@@ -60,7 +60,11 @@ studentRoutes.get("/courses/:courseId/island", async (context) =>
 );
 
 studentRoutes.get("/points", async (context) =>
-  context.json(await getStudentPoints(context.get("session").user.id)),
+  context.json(await getStudentProgress(context.get("session").user.id)),
+);
+
+studentRoutes.get("/world", async (context) =>
+  context.json(await getStudentWorld(context.get("session").user.id)),
 );
 
 studentRoutes.get("/lessons/:lessonId", async (context) =>

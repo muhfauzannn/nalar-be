@@ -1,4 +1,4 @@
-import { findStudentCourse } from "../student/student.repository";
+import { findStudentCourse, listStudentCourseRows } from "../student/student.repository";
 import {
   findPointInputs,
   insertPointAwards,
@@ -6,6 +6,7 @@ import {
   listIslandAssignments,
   listMembershipSubmissions,
   listPointEvents,
+  listStageCompletions,
   listStageStates,
   listStudentMemberships,
 } from "./gamification.repository";
@@ -15,6 +16,7 @@ import {
   type ProcessPointKind,
   type Stage,
 } from "./process-points.rules";
+import { comebacks, isThisWeek, levelFrom, weeklyMissions, weeklyRhythm } from "./progression";
 
 const STAGES: Stage[] = [
   "1_independent_effort",
@@ -71,6 +73,22 @@ function tally(events: Array<{ kind: ProcessPointKind; points: number }>) {
   return { total, byKind };
 }
 
+type SubmissionRow = Awaited<ReturnType<typeof listMembershipSubmissions>>[number];
+type EventRow = Awaited<ReturnType<typeof listPointEvents>>[number];
+
+// Finished assignments with the kinds of points they earned, for "Bangkit".
+function journeysOf(submissions: SubmissionRow[], events: EventRow[]) {
+  return submissions.flatMap((row) =>
+    row.submittedAt
+      ? [{
+          membershipId: row.membershipId,
+          finishedAt: row.submittedAt,
+          kinds: events.filter((event) => event.submissionId === row.id).map((event) => event.kind),
+        }]
+      : [],
+  );
+}
+
 const eventView = (event: Awaited<ReturnType<typeof listPointEvents>>[number]) => ({
   id: event.id,
   kind: event.kind,
@@ -122,7 +140,13 @@ export async function getCourseIsland(userId: string, courseId: string) {
       posts: STAGES.map((stage) => {
         const state = sub ? states.find((row) => row.submissionId === sub.id && row.stage === stage) : null;
         const status = state?.status === "completed" ? "done" : sub?.status === "in_progress" && sub.currentStage === stage ? "current" : "locked";
-        return { stage, status, points: own.filter((event) => event.stage === stage).reduce((sum, event) => sum + event.points, 0) };
+        const earned = own.filter((event) => event.stage === stage);
+        return {
+          stage,
+          status,
+          points: earned.reduce((sum, event) => sum + event.points, 0),
+          earned: earned.map((event) => event.kind),
+        };
       }),
       chestOpen: finished,
       points: own.reduce((sum, event) => sum + event.points, 0),
@@ -140,28 +164,73 @@ export async function getCourseIsland(userId: string, courseId: string) {
   ).length;
 
   const { total, byKind } = tally(events);
+  const own = visible.filter((row) => row.membershipId === membershipId);
   return {
     course: { id: courseRow.id, name: courseRow.name, subjectName: courseRow.subjectName },
     points: { total },
-    badges: badgesFrom(byKind),
+    badges: badgesFrom(byKind, comebacks(journeysOf(own, events))),
     bridge: { planks, total: classIds.length * assignments.length, students: classIds.length },
     buildings,
     recent: events.slice(0, 6).map(eventView),
   };
 }
 
-// Poin Nalar across every course the student is in, for the dashboard.
-export async function getStudentPoints(userId: string) {
+// Poin Nalar across every course the student is in, with the level, the weekly
+// rhythm and this week's missions, for the dashboard and the world map.
+export async function getStudentProgress(userId: string) {
   const memberships = await listStudentMemberships(userId);
   const ids = memberships.map((row) => row.id);
   const submissions = await listMembershipSubmissions(ids);
   const latest = latestBy(submissions, (row) => `${row.membershipId}:${row.assignmentId}`);
   await Promise.all([...latest.values()].map((row) => awardSubmissionPoints(row.id)));
-  const events = await listPointEvents(ids);
+  const [events, completions] = await Promise.all([
+    listPointEvents(ids),
+    listStageCompletions(submissions.map((row) => row.id)),
+  ]);
   const { total, byKind } = tally(events);
+  const now = new Date();
+  const completedAt = completions.flatMap((row) => (row.completedAt ? [row.completedAt] : []));
   return {
     total,
-    badges: badgesFrom(byKind),
+    level: levelFrom(total),
+    week: weeklyRhythm(completedAt, now),
+    missions: weeklyMissions(
+      completedAt.filter((at) => isThisWeek(at, now)).length,
+      events.filter((event) => isThisWeek(event.createdAt, now)),
+    ),
+    badges: badgesFrom(byKind, comebacks(journeysOf(submissions, events))),
     recent: events.slice(0, 5).map(eventView),
+  };
+}
+
+// Every course as an island on one map, with where the student left off.
+export async function getStudentWorld(userId: string) {
+  const courses = (await listStudentCourseRows(userId)).filter((row) => row.status === "published");
+  const islands = await Promise.all(courses.map((row) => getCourseIsland(userId, row.id)));
+  const progress = await getStudentProgress(userId);
+  return {
+    ...progress,
+    islands: islands.map((island) => {
+      const current =
+        island.buildings.find((item) => item.submissionStatus === "in_progress") ??
+        island.buildings.find((item) => item.open && !item.chestOpen) ??
+        null;
+      const post = current?.posts.findIndex((item) => item.status === "current") ?? -1;
+      return {
+        course: island.course,
+        halls: island.buildings.length,
+        hallsDone: island.buildings.filter((item) => item.chestOpen).length,
+        points: island.points.total,
+        bridge: island.bridge,
+        current: current
+          ? {
+              assignmentId: current.assignmentId,
+              title: current.title,
+              postsDone: current.posts.filter((item) => item.status === "done").length,
+              post: post >= 0 ? { index: post + 1, stage: current.posts[post]!.stage } : null,
+            }
+          : null,
+      };
+    }),
   };
 }

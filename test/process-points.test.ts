@@ -21,6 +21,7 @@ import {
   revisionDepth,
   type PointInputs,
 } from "../src/modules/gamification/process-points.rules";
+import { comebacks, levelFrom, weeklyMissions, weeklyRhythm } from "../src/modules/gamification/progression";
 import { api, joinCourse, makeCourse, makeScenario, newUser, publishCourse, type Client } from "./helpers";
 
 const STAGES = [
@@ -262,5 +263,59 @@ describe("island map and Poin Nalar ledger", () => {
     expect(reply.status).toBe(200);
     expect(reply.body.total).toBe(95);
     expect(reply.body.recent[0].assignmentId).toBe(assignmentId);
+  });
+});
+
+describe("level, weekly rhythm and Bangkit", () => {
+  test("levels cost 100, 150, 200 points and carry a title", () => {
+    expect(levelFrom(0)).toEqual({ level: 1, title: "Pendatang", into: 0, needed: 100 });
+    expect(levelFrom(99).level).toBe(1);
+    expect(levelFrom(100)).toMatchObject({ level: 2, into: 0, needed: 150 });
+    expect(levelFrom(260)).toMatchObject({ level: 3, title: "Penanya", into: 10, needed: 200 });
+  });
+
+  test("a week counts once three different days have a completed stage", () => {
+    // Thursday 5 November 2026, 10:00 WIB.
+    const now = new Date("2026-11-05T03:00:00Z");
+    const at = (iso: string) => new Date(iso);
+    const lastWeek = ["2026-10-27T02:00:00Z", "2026-10-28T02:00:00Z", "2026-10-30T02:00:00Z"].map(at);
+    const twoWeeksAgo = ["2026-10-20T02:00:00Z", "2026-10-21T02:00:00Z"].map(at);
+    // 23:30 WIB on Monday is still Monday, not Tuesday.
+    const thisWeek = [at("2026-11-02T16:30:00Z"), at("2026-11-04T01:00:00Z")];
+    const rhythm = weeklyRhythm([...twoWeeksAgo, ...lastWeek, ...thisWeek], now);
+    expect(rhythm).toEqual({ activeDays: [0, 2], target: 3, streakWeeks: 1, daysLeft: 3 });
+    expect(weeklyRhythm([...lastWeek, ...thisWeek, at("2026-11-05T01:00:00Z")], now).streakWeeks).toBe(2);
+  });
+
+  test("missions count this week's process only and stop at their target", () => {
+    expect(weeklyMissions(5, [{ kind: "reflective_question" }, { kind: "hint_request" }])).toEqual([
+      { id: "light_posts", progress: 3, target: 3 },
+      { id: "ask_well", progress: 1, target: 1 },
+      { id: "revise_deeply", progress: 0, target: 1 },
+    ]);
+  });
+
+  test("Bangkit counts a finished task that earned what the one before it missed", () => {
+    const journey = (day: number, kinds: Array<"independent_draft" | "substantial_revision" | "journey_complete">) => ({
+      membershipId: "m",
+      finishedAt: new Date(2026, 9, day),
+      kinds,
+    });
+    expect(comebacks([journey(2, ["independent_draft", "journey_complete"]), journey(1, ["independent_draft", "journey_complete"])])).toBe(0);
+    expect(comebacks([journey(1, ["journey_complete"]), journey(2, ["substantial_revision", "journey_complete"])])).toBe(1);
+  });
+
+  test("the world lists every course as an island with level and missions", async () => {
+    const { teacher, courseId, assignmentId } = await setup();
+    const ani = await student(teacher, courseId, "Ani");
+    await finishedJourney(assignmentId, ani.membershipId);
+    const reply = await api(ani.client, "GET", "/api/student/world");
+    expect(reply.status).toBe(200);
+    expect(reply.body.level).toMatchObject({ level: 1, into: 95, needed: 100 });
+    expect(reply.body.missions).toHaveLength(3);
+    expect(reply.body.islands).toHaveLength(1);
+    expect(reply.body.islands[0]).toMatchObject({ halls: 1, hallsDone: 1, points: 95, current: null });
+    expect(reply.body.badges.map((badge: { id: string }) => badge.id)).toContain("bangkit");
+    expect(JSON.stringify(reply.body)).not.toMatch(/offloading|score/i);
   });
 });

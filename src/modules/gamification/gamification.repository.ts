@@ -95,6 +95,7 @@ export async function listMembershipSubmissions(membershipIds: string[]) {
       attemptNumber: submission.attemptNumber,
       status: submission.status,
       currentStage: submission.currentStage,
+      submittedAt: submission.submittedAt,
     })
     .from(submission)
     .where(inArray(submission.studentCourseMembershipId, membershipIds));
@@ -106,6 +107,14 @@ export async function listStageStates(submissionIds: string[]) {
     .select({ submissionId: stageProgress.submissionId, stage: stageProgress.stage, status: stageProgress.status })
     .from(stageProgress)
     .where(inArray(stageProgress.submissionId, submissionIds));
+}
+
+export async function listStageCompletions(submissionIds: string[]) {
+  if (submissionIds.length === 0) return [];
+  return db
+    .select({ submissionId: stageProgress.submissionId, completedAt: stageProgress.completedAt })
+    .from(stageProgress)
+    .where(and(inArray(stageProgress.submissionId, submissionIds), eq(stageProgress.status, "completed")));
 }
 
 export async function listPointEvents(membershipIds: string[]) {
