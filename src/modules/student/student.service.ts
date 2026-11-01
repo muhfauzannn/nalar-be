@@ -1,4 +1,5 @@
 import type { AuthSession } from "../auth/auth";
+import { awardSubmissionPointsSafely } from "../gamification/gamification.service";
 import { normalizeShortAnswer, quizDefinitionsAreReady } from "../../lib/quiz-readiness";
 import {
   generateQuizReflection,
@@ -489,10 +490,12 @@ export async function completeStudentStage(input: {
   }
   // Final stage submitted: produce the reflective AI Offloading report. This is
   // best-effort and never throws, so a failed analysis cannot block submission.
+  // Poin Nalar for what this stage showed, reported back so the page can say so.
+  const points = await awardSubmissionPointsSafely(input.submissionId);
   if (nextStage === null) {
     await generateSubmissionOffloading(input.submissionId);
   }
-  return { currentStage: nextStage, submitted: nextStage === null };
+  return { currentStage: nextStage, submitted: nextStage === null, points };
 }
 
 export async function getStudentQuiz(userId: string, quizId: string) {

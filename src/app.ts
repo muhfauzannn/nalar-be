@@ -13,6 +13,7 @@ import { enrollmentRoutes } from "./modules/enrollment/enrollment.routes";
 import { EnrollmentServiceError } from "./modules/enrollment/enrollment.service";
 import { AiTutorRequestError, aiTutorRoutes } from "./modules/ai-tutor/ai-tutor.routes";
 import { AiTutorServiceError } from "./modules/ai-tutor/ai-tutor.service";
+import { GamificationError } from "./modules/gamification/gamification.service";
 import { RequestValidationError, studentRoutes } from "./modules/student/student.routes";
 import { StudentServiceError } from "./modules/student/student.service";
 
@@ -67,6 +68,9 @@ app.onError((error, context) => {
     );
   }
   if (error instanceof AiTutorRequestError) {
+    return context.json({ error: error.message }, error.status);
+  }
+  if (error instanceof GamificationError) {
     return context.json({ error: error.message }, error.status);
   }
   if (error instanceof RequestValidationError) {

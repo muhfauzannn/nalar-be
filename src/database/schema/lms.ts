@@ -924,3 +924,39 @@ export const writingSignal = pgTable(
     ),
   ],
 );
+
+export const processPointKindEnum = pgEnum("process_point_kind", [
+  "independent_draft",
+  "hint_request",
+  "reflective_question",
+  "critical_evaluation",
+  "substantial_revision",
+  "specific_reflection",
+  "journey_complete",
+]);
+
+// Poin Nalar (PRD §5.9): a ledger of process behaviours the paper looks for,
+// at most one of each kind per submission. Built only from the stage artifacts,
+// the writing signal and prompt intents, never from the AI Offloading Index.
+export const processPointEvent = pgTable(
+  "process_point_event",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => submission.id),
+    studentCourseMembershipId: uuid("student_course_membership_id")
+      .notNull()
+      .references(() => courseMembership.id),
+    kind: processPointKindEnum("kind").notNull(),
+    stage: workflowStageEnum("stage").notNull(),
+    points: smallint("points").notNull(),
+    ruleVersion: text("rule_version").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("process_point_event_submission_kind_unique").on(table.submissionId, table.kind),
+    index("process_point_event_membership_idx").on(table.studentCourseMembershipId),
+    check("process_point_event_points_check", sql`${table.points} between 1 and 50`),
+  ],
+);
