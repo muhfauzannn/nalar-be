@@ -13,6 +13,7 @@ import {
   listFactors,
   listStageProgress,
   listTutorTranscript,
+  listWritingSignals,
 } from "./analytics.repository";
 
 const LEVELS: OffloadingLevel[] = [
@@ -157,12 +158,13 @@ export async function getSubmissionProcess(userId: string, assignmentId: string,
   ]);
   if (!meta || !sub) throw notFound();
 
-  const [progress, artifacts, transcript, offloading, history] = await Promise.all([
+  const [progress, artifacts, transcript, offloading, history, signals] = await Promise.all([
     listStageProgress(submissionId),
     listArtifacts(submissionId),
     listTutorTranscript(submissionId),
     getSubmissionOffloading(submissionId),
     listCourseOffloading(meta.courseId, [sub.membershipId]),
+    listWritingSignals(submissionId),
   ]);
 
   const stages = STAGES.map((stage) => {
@@ -176,6 +178,7 @@ export async function getSubmissionProcess(userId: string, assignmentId: string,
       completedAt: iso(state?.completedAt ?? null),
       versions: versions.length,
       content: final?.content ?? null,
+      writing: writingView(signals.find((row) => row.stage === stage) ?? null),
     };
   });
 
@@ -220,5 +223,16 @@ export async function getSubmissionProcess(userId: string, assignmentId: string,
       at: iso(row.submittedAt ?? row.computedAt),
       current: row.submissionId === submissionId,
     })),
+  };
+}
+
+// How the text came about, with the one ratio a teacher reads first: how much of
+// the final text arrived by pasting rather than typing.
+function writingView(row: Awaited<ReturnType<typeof listWritingSignals>>[number] | null) {
+  if (!row) return null;
+  const { stage: _stage, ...counts } = row;
+  return {
+    ...counts,
+    pastedShare: row.finalChars > 0 ? Math.min(1, Math.round((row.pastedChars / row.finalChars) * 100) / 100) : 0,
   };
 }

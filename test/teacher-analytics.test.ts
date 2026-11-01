@@ -12,6 +12,7 @@ import {
   submission,
   tutorConversation,
   tutorMessage,
+  writingSignal,
 } from "../src/database/schema";
 import { api, joinCourse, makeCourse, makeScenario, newUser, publishCourse, type Client } from "./helpers";
 
@@ -239,5 +240,63 @@ describe("one student's process", () => {
     const ani = await student(teacher, courseId, "Ani");
     const subId = await finishedSubmission(other, ani.membershipId);
     expect((await api(teacher, "GET", `/api/manage/assignments/${assignmentId}/submissions/${subId}`)).status).toBe(404);
+  });
+});
+
+describe("writing signal (sinyal 1)", () => {
+  async function startedSubmission() {
+    const { teacher, courseId, assignmentId } = await setup();
+    expect((await api(teacher, "PATCH", `/api/manage/assignments/${assignmentId}`, { status: "published" })).status).toBe(200);
+    const learner = await student(teacher, courseId, "Ani");
+    const started = await api(learner.client, "POST", `/api/student/assignments/${assignmentId}/submissions`);
+    expect(started.status).toBe(201);
+    const submissionId = (started.body.submission?.id ?? started.body.id) as string;
+    return { teacher, learner, assignmentId, submissionId };
+  }
+  const complete = (client: Client, submissionId: string, stage: string, body: Record<string, unknown>) =>
+    api(client, "POST", `/api/student/submissions/${submissionId}/stages/${stage}/complete`, body);
+
+  test("is stored with the Stage 1 text, clamped, and shown to the teacher", async () => {
+    const { teacher, learner, assignmentId, submissionId } = await startedSubmission();
+    const content = "Draf awal saya tentang luas taman maksimum dengan keliling tetap.";
+    const reply = await complete(learner.client, submissionId, "1_independent_effort", {
+      content,
+      signals: {
+        activeSeconds: 95.4,
+        typedChars: 30,
+        deletedChars: -5,
+        pasteCount: 1,
+        pastedChars: 40,
+        largestPaste: 999,
+        longPauses: 2,
+        focusLosses: 3,
+        recorderVersion: "web-v1",
+      },
+    });
+    expect(reply.status).toBe(200);
+
+    const [row] = await db.select().from(writingSignal).where(eq(writingSignal.submissionId, submissionId));
+    expect(row).toMatchObject({
+      stage: "1_independent_effort",
+      activeSeconds: 95,
+      typedChars: 30,
+      deletedChars: 0,
+      pastedChars: 40,
+      largestPaste: 40,
+      finalChars: content.length,
+      recorderVersion: "web-v1",
+    });
+
+    const process = await api(teacher, "GET", `/api/manage/assignments/${assignmentId}/submissions/${submissionId}`);
+    expect(process.body.stages[0].writing).toMatchObject({ pasteCount: 1, focusLosses: 3, pastedShare: 0.62 });
+    expect(process.body.stages[3].writing).toBeNull();
+  });
+
+  test("a stage without a written text, or a malformed signal, stores nothing and still completes", async () => {
+    const { learner, submissionId } = await startedSubmission();
+    expect((await complete(learner.client, submissionId, "1_independent_effort", { content: "Draf awal yang cukup panjang.", signals: "rusak" })).status).toBe(200);
+    expect((await complete(learner.client, submissionId, "2_guided_questioning", { content: "", signals: { typedChars: 5 } })).status).toBe(200);
+    const rows = await db.select().from(writingSignal).where(eq(writingSignal.submissionId, submissionId));
+    expect(rows).toHaveLength(0);
   });
 });

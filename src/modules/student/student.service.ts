@@ -29,6 +29,7 @@ import {
   workflowStages,
   type QuizAnswerInput as QuizAnswerValue,
   type WorkflowStage,
+  type WritingSignalInput,
 } from "./student.repository";
 
 export type QuizAnswerInput = QuizAnswerValue;
@@ -395,6 +396,7 @@ export async function completeStudentStage(input: {
   submissionId: string;
   stage: WorkflowStage;
   content?: string;
+  signals?: WritingSignalInput;
 }) {
   const access = await findSubmissionAccess(input.submissionId, input.userId);
   if (!access) {
@@ -460,6 +462,7 @@ export async function completeStudentStage(input: {
     stage: input.stage,
     nextStage,
     content: requiresArtifact ? content : undefined,
+    signals: input.signals,
   });
   if (!completion.applied) {
     const currentIndex = completion.currentStage

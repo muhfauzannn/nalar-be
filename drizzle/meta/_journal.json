@@ -57,6 +57,13 @@
       "when": 1792627200000,
       "tag": "0007_teacher_self_enrollment",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793514444302,
+      "tag": "0008_writing_signal",
+      "breakpoints": true
     }
   ]
 }

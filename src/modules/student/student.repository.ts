@@ -24,6 +24,7 @@ import {
   submission,
   submissionAssessment,
   user,
+  writingSignal,
 } from "../../database/schema";
 
 export const workflowStages = [
@@ -584,11 +585,24 @@ export async function createStudentSubmission(
   });
 }
 
+export type WritingSignalInput = {
+  activeSeconds: number;
+  typedChars: number;
+  deletedChars: number;
+  pasteCount: number;
+  pastedChars: number;
+  largestPaste: number;
+  longPauses: number;
+  focusLosses: number;
+  recorderVersion: string;
+};
+
 export async function persistStageCompletion(input: {
   submissionId: string;
   stage: WorkflowStage;
   nextStage: WorkflowStage | null;
   content?: string;
+  signals?: WritingSignalInput;
 }) {
   return db.transaction(async (transaction) => {
     const now = new Date();
@@ -645,6 +659,23 @@ export async function persistStageCompletion(input: {
         version: (latest?.version ?? 0) + 1,
         isFinal: true,
       });
+    }
+
+    // Only the two stages the student writes on their own carry a writing signal.
+    if (
+      input.signals &&
+      input.content !== undefined &&
+      (input.stage === "1_independent_effort" || input.stage === "4_revision_finalization")
+    ) {
+      await transaction
+        .insert(writingSignal)
+        .values({
+          submissionId: input.submissionId,
+          stage: input.stage,
+          ...input.signals,
+          finalChars: input.content.length,
+        })
+        .onConflictDoNothing();
     }
 
     const [completedStage] = await transaction

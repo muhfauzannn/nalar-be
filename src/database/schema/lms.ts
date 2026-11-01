@@ -885,3 +885,42 @@ export const quizUsageReflection = pgTable(
     check("quiz_usage_reflection_redirected_check", sql`${table.redirectedCount} >= 0`),
   ],
 );
+
+// Writing-behaviour signal (PRD §5.3, sinyal 1): a summary of how a Stage 1 or
+// Stage 4 text was written, recorded in the browser and stored once when the
+// stage is completed. Never individual keystrokes or their content.
+export const writingSignal = pgTable(
+  "writing_signal",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => submission.id),
+    stage: workflowStageEnum("stage").notNull(),
+    activeSeconds: integer("active_seconds").notNull(),
+    typedChars: integer("typed_chars").notNull(),
+    deletedChars: integer("deleted_chars").notNull(),
+    pasteCount: integer("paste_count").notNull(),
+    pastedChars: integer("pasted_chars").notNull(),
+    largestPaste: integer("largest_paste").notNull(),
+    longPauses: integer("long_pauses").notNull(),
+    focusLosses: integer("focus_losses").notNull(),
+    finalChars: integer("final_chars").notNull(),
+    recorderVersion: text("recorder_version").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("writing_signal_submission_stage_unique").on(table.submissionId, table.stage),
+    check(
+      "writing_signal_stage_check",
+      sql`${table.stage} in ('1_independent_effort', '4_revision_finalization')`,
+    ),
+    check(
+      "writing_signal_counts_check",
+      sql`${table.activeSeconds} >= 0 and ${table.typedChars} >= 0 and ${table.deletedChars} >= 0
+        and ${table.pasteCount} >= 0 and ${table.pastedChars} >= 0 and ${table.largestPaste} >= 0
+        and ${table.longPauses} >= 0 and ${table.focusLosses} >= 0 and ${table.finalChars} >= 0
+        and ${table.largestPaste} <= ${table.pastedChars}`,
+    ),
+  ],
+);

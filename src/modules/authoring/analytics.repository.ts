@@ -14,6 +14,7 @@ import {
   tutorConversation,
   tutorMessage,
   user,
+  writingSignal,
 } from "../../database/schema";
 
 // Teacher-side reads of the learning process. Everything here is the same
@@ -194,4 +195,22 @@ export async function listTutorTranscript(submissionId: string) {
     .leftJoin(promptClassification, eq(promptClassification.messageId, tutorMessage.id))
     .where(eq(tutorConversation.submissionId, submissionId))
     .orderBy(asc(tutorMessage.sequence));
+}
+
+export async function listWritingSignals(submissionId: string) {
+  return db
+    .select({
+      stage: writingSignal.stage,
+      activeSeconds: writingSignal.activeSeconds,
+      typedChars: writingSignal.typedChars,
+      deletedChars: writingSignal.deletedChars,
+      pasteCount: writingSignal.pasteCount,
+      pastedChars: writingSignal.pastedChars,
+      largestPaste: writingSignal.largestPaste,
+      longPauses: writingSignal.longPauses,
+      focusLosses: writingSignal.focusLosses,
+      finalChars: writingSignal.finalChars,
+    })
+    .from(writingSignal)
+    .where(eq(writingSignal.submissionId, submissionId));
 }

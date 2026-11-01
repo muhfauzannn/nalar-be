@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { fileResponse } from "../../lib/file-response";
 import { requireSession, type StudentVariables } from "./student.auth";
-import { workflowStages, type WorkflowStage } from "./student.repository";
+import { workflowStages, type WorkflowStage, type WritingSignalInput } from "./student.repository";
 import {
   completeStudentStage,
   deleteStudentQuizAnswer,
@@ -119,6 +119,7 @@ studentRoutes.post(
         submissionId: requiredId(context.req.param("submissionId")),
         stage,
         content: body.content,
+        signals: parseWritingSignals(body.signals),
       }),
     );
   },
@@ -211,6 +212,35 @@ studentRoutes.post("/quiz-attempts/:attemptId/reflection", async (context) =>
     ),
   ),
 );
+
+// The writing signal is supporting evidence, never a reason to refuse a stage:
+// anything malformed is dropped rather than rejected.
+const SIGNAL_LIMIT = 10_000_000;
+function parseWritingSignals(value: unknown): WritingSignalInput | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const count = (key: string, max = SIGNAL_LIMIT) => {
+    const number = raw[key];
+    return typeof number === "number" && Number.isFinite(number)
+      ? Math.min(max, Math.max(0, Math.round(number)))
+      : 0;
+  };
+  const pastedChars = count("pastedChars");
+  return {
+    activeSeconds: count("activeSeconds", 7 * 24 * 60 * 60),
+    typedChars: count("typedChars"),
+    deletedChars: count("deletedChars"),
+    pasteCount: count("pasteCount"),
+    pastedChars,
+    largestPaste: Math.min(count("largestPaste"), pastedChars),
+    longPauses: count("longPauses"),
+    focusLosses: count("focusLosses"),
+    recorderVersion:
+      typeof raw.recorderVersion === "string" && /^[a-z0-9.-]{1,32}$/.test(raw.recorderVersion)
+        ? raw.recorderVersion
+        : "unknown",
+  };
+}
 
 export class RequestValidationError extends Error {
   readonly status = 400;
