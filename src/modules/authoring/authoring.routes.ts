@@ -23,6 +23,7 @@ import {
   parseResourceEdit,
   parseResourceUpload,
 } from "./authoring.parsers";
+import { getAssignmentAnalytics, getSubmissionProcess } from "./analytics.service";
 import {
   copyMyAssignment,
   createMyAssignment,
@@ -309,6 +310,22 @@ authoringRoutes.post("/courses/:courseId/assignments", async (context) => {
 authoringRoutes.get("/assignments/:assignmentId", async (context) =>
   context.json(
     await getMyAssignment(me(context), param(context, "assignmentId", "ID assignment")),
+  ),
+);
+
+authoringRoutes.get("/assignments/:assignmentId/analytics", async (context) =>
+  context.json(
+    await getAssignmentAnalytics(me(context), param(context, "assignmentId", "ID assignment")),
+  ),
+);
+
+authoringRoutes.get("/assignments/:assignmentId/submissions/:submissionId", async (context) =>
+  context.json(
+    await getSubmissionProcess(
+      me(context),
+      param(context, "assignmentId", "ID assignment"),
+      param(context, "submissionId", "ID pengerjaan"),
+    ),
   ),
 );
 
