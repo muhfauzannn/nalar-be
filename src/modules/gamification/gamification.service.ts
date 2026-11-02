@@ -1,6 +1,6 @@
 import { findLab, LAB_CHALLENGE_POINTS } from "../labs/lab-catalog";
 import { listCourseLabs, listLabCompletions } from "../labs/labs.repository";
-import { findStudentCourse, listStudentCourseRows } from "../student/student.repository";
+import { findStudentCourse } from "../student/student.repository";
 import {
   findPointInputs,
   insertPointAwards,
@@ -217,37 +217,5 @@ export async function getStudentProgress(userId: string) {
     ),
     badges: badgesFrom(byKind, comebacks(journeysOf(submissions, events))),
     recent: events.slice(0, 5).map(eventView),
-  };
-}
-
-// Every course as an island on one map, with where the student left off.
-export async function getStudentWorld(userId: string) {
-  const courses = (await listStudentCourseRows(userId)).filter((row) => row.status === "published");
-  const islands = await Promise.all(courses.map((row) => getCourseIsland(userId, row.id)));
-  const progress = await getStudentProgress(userId);
-  return {
-    ...progress,
-    islands: islands.map((island) => {
-      const current =
-        island.buildings.find((item) => item.submissionStatus === "in_progress") ??
-        island.buildings.find((item) => item.open && !item.chestOpen) ??
-        null;
-      const post = current?.posts.findIndex((item) => item.status === "current") ?? -1;
-      return {
-        course: island.course,
-        halls: island.buildings.length,
-        hallsDone: island.buildings.filter((item) => item.chestOpen).length,
-        points: island.points.total,
-        bridge: island.bridge,
-        current: current
-          ? {
-              assignmentId: current.assignmentId,
-              title: current.title,
-              postsDone: current.posts.filter((item) => item.status === "done").length,
-              post: post >= 0 ? { index: post + 1, stage: current.posts[post]!.stage } : null,
-            }
-          : null,
-      };
-    }),
   };
 }

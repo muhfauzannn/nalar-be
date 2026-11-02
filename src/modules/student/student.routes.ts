@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 
 import { fileResponse } from "../../lib/file-response";
-import { getCourseIsland, getStudentProgress, getStudentWorld } from "../gamification/gamification.service";
+import { getCourseIsland, getStudentProgress } from "../gamification/gamification.service";
 import { completeLabChallenge } from "../labs/labs.service";
 import { requireSession, type StudentVariables } from "./student.auth";
+import { getStudentWorld } from "./world.service";
 import { workflowStages, type WorkflowStage, type WritingSignalInput } from "./student.repository";
 import {
   completeStudentStage,
