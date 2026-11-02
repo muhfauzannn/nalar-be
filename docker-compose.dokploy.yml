@@ -11,6 +11,10 @@ services:
     environment:
       # Uploaded PDFs go to Cloudflare R2. The S3_* credentials live in ../persistent/be.env.
       STORAGE_DRIVER: s3
+      # The database runs next to the API on this server (Dokploy postgres
+      # "nalar-db"), not on Neon: every query was a trip to us-east-1. Overrides
+      # DATABASE_URL in ../persistent/be.env; the password is in Dokploy's env.
+      DATABASE_URL: postgresql://nalar:${NALAR_DB_PASSWORD:?set NALAR_DB_PASSWORD in the Dokploy environment}@nalar-db-spwikl:5432/nalar
     ports:
       - "127.0.0.1:8100:8000"
     restart: unless-stopped
