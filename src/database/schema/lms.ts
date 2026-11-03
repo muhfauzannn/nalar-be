@@ -711,6 +711,9 @@ export const tutorConversation = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     submissionId: uuid("submission_id").references(() => submission.id),
     quizAttemptId: uuid("quiz_attempt_id").references(() => quizAttempt.id),
+    // A lab has no attempt of its own: its conversation belongs to one student in one lab.
+    lessonLabId: uuid("lesson_lab_id").references(() => lessonLab.id),
+    studentCourseMembershipId: uuid("student_course_membership_id").references(() => courseMembership.id),
     ...timestamps,
   },
   (table) => [
@@ -720,9 +723,16 @@ export const tutorConversation = pgTable(
     uniqueIndex("tutor_conversation_quiz_attempt_unique")
       .on(table.quizAttemptId)
       .where(sql`${table.quizAttemptId} is not null`),
+    uniqueIndex("tutor_conversation_lab_student_unique")
+      .on(table.lessonLabId, table.studentCourseMembershipId)
+      .where(sql`${table.lessonLabId} is not null`),
     check(
       "tutor_conversation_one_target_check",
-      sql`num_nonnulls(${table.submissionId}, ${table.quizAttemptId}) = 1`,
+      sql`num_nonnulls(${table.submissionId}, ${table.quizAttemptId}, ${table.lessonLabId}) = 1`,
+    ),
+    check(
+      "tutor_conversation_lab_student_check",
+      sql`(${table.lessonLabId} is null) = (${table.studentCourseMembershipId} is null)`,
     ),
   ],
 );

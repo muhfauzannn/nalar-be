@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../src/database/client";
 import { courseMembership, quizAttempt } from "../src/database/schema";
 import { findOrCreateTutorConversation } from "../src/modules/ai-tutor/ai-tutor.repository";
+import { LAB_TUTOR_BRIEFS } from "../src/modules/ai-tutor/lab-tutor.config";
+import { LAB_CATALOG } from "../src/modules/labs/lab-catalog";
 import { tutorSessionLimiter } from "../src/modules/ai-tutor/ai-tutor.service";
 import {
   api,
@@ -100,5 +102,50 @@ describe("tutor conversations belong to the student whose work they are about", 
     expect((await messagesOf(alice, conversation!.id)).status).toBe(200);
     expect((await messagesOf(bob, conversation!.id)).status).toBe(404);
     expect((await messagesOf(teacher, conversation!.id)).status).toBe(404);
+  });
+});
+
+async function labWithTwoStudents() {
+  const { teacher, course, alice, bob } = await twoStudentsInAuthoredCourse();
+  const module = await api(teacher, "POST", `/api/manage/courses/${course.id}/modules`, { title: "Gerak", status: "published" });
+  const lesson = await api(teacher, "POST", `/api/manage/modules/${module.body.id}/lessons`, { title: "Parabola", content: "Isi", status: "published" });
+  const attached = await api(teacher, "POST", `/api/manage/lessons/${lesson.body.id}/labs`, { labKey: "gerak-parabola" });
+  expect(attached.status).toBe(201);
+  const membershipOf = async (client: Client) => {
+    const [row] = await db
+      .select({ id: courseMembership.id })
+      .from(courseMembership)
+      .where(and(eq(courseMembership.courseId, course.id), eq(courseMembership.userId, client.id), eq(courseMembership.role, "student")));
+    return row!.id;
+  };
+  return { teacher, alice, bob, labId: attached.body.labs[0].id as string, membershipOf };
+}
+
+describe("lab tutor conversations", () => {
+  test("belong to one student in one lab: a classmate and the teacher cannot read them", async () => {
+    const { teacher, alice, bob, labId, membershipOf } = await labWithTwoStudents();
+    const conversation = await findOrCreateTutorConversation({ lessonLabId: labId, studentCourseMembershipId: await membershipOf(alice) });
+
+    expect((await messagesOf(alice, conversation!.id)).status).toBe(200);
+    expect((await messagesOf(bob, conversation!.id)).status).toBe(404);
+    expect((await messagesOf(teacher, conversation!.id)).status).toBe(404);
+  });
+
+  test("each student gets their own conversation in the same lab, found again on the next session", async () => {
+    const { alice, bob, labId, membershipOf } = await labWithTwoStudents();
+    const aliceTarget = { lessonLabId: labId, studentCourseMembershipId: await membershipOf(alice) };
+    const first = await findOrCreateTutorConversation(aliceTarget);
+    const again = await findOrCreateTutorConversation(aliceTarget);
+    const bobs = await findOrCreateTutorConversation({ lessonLabId: labId, studentCourseMembershipId: await membershipOf(bob) });
+    expect(again!.id).toBe(first!.id);
+    expect(bobs!.id).not.toBe(first!.id);
+  });
+
+  test("every lab in the catalog has a tutor brief for exactly its missions", () => {
+    for (const lab of LAB_CATALOG) {
+      const brief = LAB_TUTOR_BRIEFS[lab.key];
+      expect(brief).toBeDefined();
+      expect(Object.keys(brief.missions).sort()).toEqual([...lab.challenges].sort());
+    }
   });
 });

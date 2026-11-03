@@ -1,0 +1,8 @@
+ALTER TABLE "tutor_conversation" DROP CONSTRAINT "tutor_conversation_one_target_check";--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD COLUMN "lesson_lab_id" uuid;--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD COLUMN "student_course_membership_id" uuid;--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD CONSTRAINT "tutor_conversation_lesson_lab_id_lesson_lab_id_fk" FOREIGN KEY ("lesson_lab_id") REFERENCES "public"."lesson_lab"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD CONSTRAINT "tutor_conversation_student_course_membership_id_course_membership_id_fk" FOREIGN KEY ("student_course_membership_id") REFERENCES "public"."course_membership"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "tutor_conversation_lab_student_unique" ON "tutor_conversation" USING btree ("lesson_lab_id","student_course_membership_id") WHERE "tutor_conversation"."lesson_lab_id" is not null;--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD CONSTRAINT "tutor_conversation_lab_student_check" CHECK (("tutor_conversation"."lesson_lab_id" is null) = ("tutor_conversation"."student_course_membership_id" is null));--> statement-breakpoint
+ALTER TABLE "tutor_conversation" ADD CONSTRAINT "tutor_conversation_one_target_check" CHECK (num_nonnulls("tutor_conversation"."submission_id", "tutor_conversation"."quiz_attempt_id", "tutor_conversation"."lesson_lab_id") = 1);

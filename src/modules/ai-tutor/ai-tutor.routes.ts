@@ -55,6 +55,16 @@ aiTutorRoutes.post("/sessions", async (context) => {
       201,
     );
   }
+  if (targetType === "lab") {
+    return context.json(
+      await createAiTutorSession({
+        userId: context.get("session").user.id,
+        target: { targetType, targetId },
+        mode,
+      }),
+      201,
+    );
+  }
   throw new AiTutorRequestError("Jenis aktivitas AI Tutor tidak valid.");
 });
 
@@ -113,7 +123,7 @@ aiTutorRoutes.post("/conversations/:conversationId/replies", async (context) => 
 // server. The client reports those here so they land in the same logs as our own failures.
 // Log-only on purpose: nothing a student sends may change what other students are allowed to do.
 const sessionEventLimiter = createRateLimiter({ maxEvents: 120, windowMs: 10 * 60 * 1_000 });
-const EVENT_SURFACES = ["pdf", "quiz", "assignment"] as const;
+const EVENT_SURFACES = ["pdf", "quiz", "assignment", "lab"] as const;
 const EVENT_NAMES = ["connect_failed", "closed", "retry_scheduled", "renewed", "renew_failed", "idle_closed", "response_timeout", "response_recovery", "empty_response"] as const;
 const EVENT_KINDS = ["quota", "token_expired", "session_limit", "busy", "unavailable", "network", "unknown"] as const;
 

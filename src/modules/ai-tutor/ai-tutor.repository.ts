@@ -1,10 +1,14 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../../database/client";
 import {
   assignment,
   course,
   courseMembership,
+  labChallengeCompletion,
+  learningModule,
+  lesson,
+  lessonLab,
   promptClassification,
   quiz,
   quizAttempt,
@@ -230,15 +234,68 @@ export async function findQuizTutorTurnAccess(
   return access ?? null;
 }
 
+// A lab the student can open (same visibility rule as its lesson), with what they have solved in it.
+export async function findLabTutorTarget(userId: string, lessonLabId: string) {
+  const [target] = await db
+    .select({
+      lessonLabId: lessonLab.id,
+      labKey: lessonLab.labKey,
+      lessonTitle: lesson.title,
+      courseName: course.name,
+      membershipId: courseMembership.id,
+      enrollmentStatus: courseMembership.status,
+    })
+    .from(lessonLab)
+    .innerJoin(lesson, eq(lesson.id, lessonLab.lessonId))
+    .innerJoin(learningModule, eq(learningModule.id, lesson.moduleId))
+    .innerJoin(course, eq(course.id, learningModule.courseId))
+    .innerJoin(
+      courseMembership,
+      and(
+        eq(courseMembership.courseId, course.id),
+        eq(courseMembership.userId, userId),
+        eq(courseMembership.role, "student"),
+        inArray(courseMembership.status, ["active", "completed"]),
+      ),
+    )
+    .where(
+      and(
+        eq(lessonLab.id, lessonLabId),
+        eq(lesson.status, "published"),
+        eq(learningModule.status, "published"),
+        inArray(course.status, ["published", "archived"]),
+      ),
+    )
+    .limit(1);
+  if (!target) return null;
+  const solved = await db
+    .select({ challenge: labChallengeCompletion.challenge })
+    .from(labChallengeCompletion)
+    .where(
+      and(
+        eq(labChallengeCompletion.lessonLabId, lessonLabId),
+        eq(labChallengeCompletion.studentCourseMembershipId, target.membershipId),
+      ),
+    );
+  return { ...target, solved: solved.map((row) => row.challenge) };
+}
+
 export async function findOrCreateTutorConversation(target: {
   submissionId?: string;
   quizAttemptId?: string;
+  lessonLabId?: string;
+  studentCourseMembershipId?: string;
 }) {
   const condition = target.submissionId
     ? eq(tutorConversation.submissionId, target.submissionId)
     : target.quizAttemptId
       ? eq(tutorConversation.quizAttemptId, target.quizAttemptId)
-      : null;
+      : target.lessonLabId && target.studentCourseMembershipId
+        ? and(
+            eq(tutorConversation.lessonLabId, target.lessonLabId),
+            eq(tutorConversation.studentCourseMembershipId, target.studentCourseMembershipId),
+          )
+        : null;
   if (!condition) throw new Error("Tutor conversation target is required");
   const [existing] = await db
     .select()

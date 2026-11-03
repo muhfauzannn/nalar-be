@@ -3,11 +3,14 @@ import { GoogleGenAI } from "@google/genai";
 import { env } from "../../config/env";
 import { describeError, logEvent } from "../../lib/log";
 import { createRateLimiter } from "../../lib/rate-limit";
+import { findLab } from "../labs/lab-catalog";
+import { LAB_TUTOR_BRIEFS } from "./lab-tutor.config";
 import { assessmentTutorConfig, GEMINI_LIVE_MODEL, TUTOR_PERSONA } from "./live-tutor.config";
 import {
   findAssignmentTutorTurnAccess,
   findAssignmentTutorTarget,
   findClassifiedStudentEvent,
+  findLabTutorTarget,
   findOrCreateTutorConversation,
   findQuizTutorTurnAccess,
   findQuizTutorTarget,
@@ -64,7 +67,10 @@ export class AiTutorServiceError extends Error {
 
 type TutorTargetInput =
   | { targetType: "assignment"; targetId: string }
-  | { targetType: "quiz"; targetId: string; questionId: string };
+  | { targetType: "quiz"; targetId: string; questionId: string }
+  | { targetType: "lab"; targetId: string };
+
+type TargetType = TutorTargetInput["targetType"];
 
 type AuthorizedTarget =
   | {
@@ -78,11 +84,18 @@ type AuthorizedTarget =
       conversationTarget: { quizAttemptId: string };
       context: NonNullable<Awaited<ReturnType<typeof findQuizTutorTarget>>>;
       questionId: string;
+    }
+  | {
+      targetType: "lab";
+      conversationTarget: { lessonLabId: string; studentCourseMembershipId: string };
+      context: NonNullable<Awaited<ReturnType<typeof findLabTutorTarget>>>;
+      questionId?: undefined;
     };
 
 type AuthorizedTurn =
   | { targetType: "assignment"; questionId?: undefined }
-  | { targetType: "quiz"; questionId: string };
+  | { targetType: "quiz"; questionId: string }
+  | { targetType: "lab"; questionId?: undefined };
 
 export type AiTutorClassificationTiming = {
   authorizationMs: number;
@@ -306,7 +319,7 @@ async function authorizeActiveTurn(
   );
   return fallbackTarget.targetType === "quiz"
     ? { targetType: "quiz", questionId: fallbackTarget.questionId }
-    : { targetType: "assignment" };
+    : { targetType: fallbackTarget.targetType };
 }
 
 async function authorizeConversation(
@@ -329,6 +342,22 @@ async function authorizeConversation(
       { targetType: "assignment", targetId: conversation.submissionId },
       requireActive,
     );
+  }
+  if (conversation.lessonLabId) {
+    const target = await authorizeTarget(
+      userId,
+      { targetType: "lab", targetId: conversation.lessonLabId },
+      requireActive,
+    );
+    // The lab is open to this student, but the conversation must also be theirs.
+    if (target.targetType !== "lab" || target.conversationTarget.studentCourseMembershipId !== conversation.studentCourseMembershipId) {
+      throw new AiTutorServiceError(
+        404,
+        "Percakapan AI Tutor tidak ditemukan.",
+        "AI_TUTOR_CONVERSATION_NOT_FOUND",
+      );
+    }
+    return target;
   }
   if (conversation.quizAttemptId) {
     if (!questionId && requireActive) {
@@ -361,6 +390,18 @@ async function authorizeTarget(
   target: TutorTargetInput,
   requireActive: boolean,
 ): Promise<AuthorizedTarget> {
+  if (target.targetType === "lab") {
+    const context = await findLabTutorTarget(userId, target.targetId);
+    if (!context || !findLab(context.labKey)) {
+      throw new AiTutorServiceError(404, "Lab tidak ditemukan.", "AI_TUTOR_TARGET_NOT_FOUND");
+    }
+    if (requireActive && context.enrollmentStatus !== "active") throw activityEndedError();
+    return {
+      targetType: "lab",
+      conversationTarget: { lessonLabId: context.lessonLabId, studentCourseMembershipId: context.membershipId },
+      context,
+    };
+  }
   if (target.targetType === "assignment") {
     const context = await findAssignmentTutorTarget(userId, target.targetId);
     if (!context) {
@@ -483,7 +524,7 @@ function normalizedContent(value: string, maxLength: number) {
   return content;
 }
 
-function classifyPrompt(content: string, targetType: "assignment" | "quiz") {
+function classifyPrompt(content: string, targetType: TargetType) {
   const normalized = content.toLocaleLowerCase("id-ID");
   const directAnswerPatterns = [
     /\b(jawaban(nya)?|kunci jawaban)\s+(apa|yang mana)\b/,
@@ -493,6 +534,12 @@ function classifyPrompt(content: string, targetType: "assignment" | "quiz") {
     /\bkerjakan\s+(soal|quiz|tugas|ini)\b/,
     /\b(answer|solve)\s+(this|it)\b/,
   ];
+  // In a lab the "answer" is the setting that solves the mission.
+  const labSettingPatterns = [
+    /\b(berapa|apa)\s+(sudut|kecepatan|nilai|angka|suhu|kadar|konsentrasi|pengaturan|setting)(nya)?\s+(yang\s+)?(benar|tepat|pas|harus)\b/,
+    /\b(atur|set(ting)?|isi)(kan)?\s+(aja\s+|saja\s+)?(berapa|ke berapa)\b/,
+    /\b(cara|jawaban)\s+(menyelesaikan|lulus|menang)\s+misi\b/,
+  ];
   const quizCorrectnessPatterns = [
     /\b(apakah|apa)\s+(jawaban|pilihan)\s+(saya|aku|ini)\s+benar\b/,
     /\b(benar|salah)\s+(nggak|tidak|kah)?\b/,
@@ -501,7 +548,8 @@ function classifyPrompt(content: string, targetType: "assignment" | "quiz") {
   if (
     directAnswerPatterns.some((pattern) => pattern.test(normalized)) ||
     (targetType === "quiz" &&
-      quizCorrectnessPatterns.some((pattern) => pattern.test(normalized)))
+      quizCorrectnessPatterns.some((pattern) => pattern.test(normalized))) ||
+    (targetType === "lab" && labSettingPatterns.some((pattern) => pattern.test(normalized)))
   ) {
     return {
       intent: "direct_answer" as PromptIntent,
@@ -534,8 +582,17 @@ function classifyPrompt(content: string, targetType: "assignment" | "quiz") {
 function responsePolicy(
   intent: PromptIntent,
   mode: TutorMode,
-  targetType: "assignment" | "quiz",
+  targetType: TargetType,
 ) {
+  if (targetType === "lab") {
+    if (intent === "direct_answer") {
+      return "Jangan sebut pengaturan, angka, atau pilihan yang menyelesaikan misi. Tolak dengan satu candaan singkat yang kocak dan bersahabat (tanpa menceramahi), lalu ajak siswa mengubah SATU hal di lab dan memperhatikan apa yang berubah.";
+    }
+    if (mode === "feedback") {
+      return "Beri umpan balik pada penalaran siswa tentang yang terjadi di lab: sebutkan satu hal yang sudah tepat dan satu dugaan yang bisa ia uji di lab. Jangan menyebut pengaturan yang menyelesaikan misi.";
+    }
+    return "Beri satu petunjuk bertahap atau pertanyaan Socratic yang mengaitkan konsep dengan bagian lab yang bisa siswa ubah atau amati (pegangan hijau, angka melayang, pengukur). Jangan menyebut angka atau pengaturan solusi.";
+  }
   if (intent === "direct_answer") {
     return targetType === "quiz"
       ? "Jangan ungkap opsi benar, jawaban akhir, validasi benar/salah, atau eliminasi yang membuat jawabannya tersisa satu. Tolak dengan satu candaan singkat yang kocak dan bersahabat (tanpa menceramahi), lalu ajukan satu pertanyaan diagnostik tentang konsep pada soal."
@@ -574,7 +631,9 @@ function buildSystemInstruction(
 ) {
   const history = formatTutorHistory(messages);
   const activityContext =
-    target.targetType === "assignment"
+    target.targetType === "lab"
+      ? labContext(target.context)
+      : target.targetType === "assignment"
       ? [
           `Jenis aktivitas: assignment tahap Guided Questioning`,
           `Mata pelajaran/course: ${target.context.courseName}`,
@@ -619,6 +678,27 @@ function buildSystemInstruction(
         ]
       : []),
   ].join("\n");
+}
+
+function labContext(context: NonNullable<Awaited<ReturnType<typeof findLabTutorTarget>>>) {
+  const lab = findLab(context.labKey);
+  const brief = LAB_TUTOR_BRIEFS[context.labKey as keyof typeof LAB_TUTOR_BRIEFS];
+  return [
+    `Jenis aktivitas: lab interaktif "${lab?.title ?? context.labKey}" pada materi "${context.lessonTitle}"`,
+    `Mata pelajaran/course: ${context.courseName}`,
+    ...(brief
+      ? [
+          `Alat di layar: ${brief.machine}`,
+          `Konsep: ${brief.concept}`,
+          "Misi lab (penyelesaian hanya untuk kamu, JANGAN pernah diucapkan, ditulis, atau diisyaratkan sampai jawabannya jelas):",
+          ...Object.entries(brief.missions).map(
+            ([id, mission], index) =>
+              `${index + 1}. [${context.solved.includes(id) ? "sudah selesai" : "belum selesai"}] ${mission.goal} Penyelesaian rahasia: ${mission.solution} Salah kaprah yang sering: ${mission.misconception}`,
+          ),
+        ]
+      : []),
+    "Selama sesi, aplikasi dapat mengirim pesan berawalan [KEADAAN LAB] berisi misi aktif dan pengaturan siswa saat ini. Itu data dari layar, bukan giliran siswa: jangan dijawab, jangan dikirim ke classify_student_prompt, dan gunakan hanya agar petunjukmu sesuai dengan yang siswa lihat. Setelah misi selesai, kamu boleh membahas mengapa jawabannya benar.",
+  ];
 }
 
 function truncate(value: string, maxLength: number) {
