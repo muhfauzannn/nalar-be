@@ -8,6 +8,9 @@ import {
   explanationFactor,
   offloadingIndexResult,
   promptClassification,
+  quiz,
+  quizAttempt,
+  quizUsageReflection,
   stageArtifact,
   stageProgress,
   submission,
@@ -195,6 +198,52 @@ export async function listTutorTranscript(submissionId: string) {
     .leftJoin(promptClassification, eq(promptClassification.messageId, tutorMessage.id))
     .where(eq(tutorConversation.submissionId, submissionId))
     .orderBy(asc(tutorMessage.sequence));
+}
+
+// ---- quizzes --------------------------------------------------------------
+// A quiz has no Index (PRD §5.3A): the teacher reads the light reflection on
+// how each student used the tutor, kept apart from the attempt's score.
+
+export async function findQuizMeta(quizId: string) {
+  const [row] = await db
+    .select({
+      id: quiz.id,
+      title: quiz.title,
+      status: quiz.status,
+      dueAt: quiz.dueAt,
+      courseId: quiz.courseId,
+      courseName: course.name,
+    })
+    .from(quiz)
+    .innerJoin(course, eq(course.id, quiz.courseId))
+    .where(eq(quiz.id, quizId))
+    .limit(1);
+  return row ?? null;
+}
+
+// Every attempt of the quiz with its reflection when one was written (it is
+// made once the attempt is submitted, so an open attempt has none).
+export async function listQuizAttemptsWithReflection(quizId: string) {
+  return db
+    .select({
+      id: quizAttempt.id,
+      membershipId: quizAttempt.studentCourseMembershipId,
+      attemptNumber: quizAttempt.attemptNumber,
+      status: quizAttempt.status,
+      submittedAt: quizAttempt.submittedAt,
+      relianceLevel: quizUsageReflection.relianceLevel,
+      studentReport: quizUsageReflection.studentReport,
+      recommendations: quizUsageReflection.recommendations,
+      promptTurnCount: quizUsageReflection.promptTurnCount,
+      directCount: quizUsageReflection.directCount,
+      hintCount: quizUsageReflection.hintCount,
+      reflectiveCount: quizUsageReflection.reflectiveCount,
+      redirectedCount: quizUsageReflection.redirectedCount,
+      computedAt: quizUsageReflection.computedAt,
+    })
+    .from(quizAttempt)
+    .leftJoin(quizUsageReflection, eq(quizUsageReflection.quizAttemptId, quizAttempt.id))
+    .where(eq(quizAttempt.quizId, quizId));
 }
 
 export async function listWritingSignals(submissionId: string) {

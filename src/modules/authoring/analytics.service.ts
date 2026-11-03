@@ -1,16 +1,19 @@
 import { getSubmissionOffloading } from "../ai-analysis/ai-analysis.service";
-import type { OffloadingLevel } from "../ai-analysis/ai-analysis.repository";
+import type { AiRelianceLevel, OffloadingLevel } from "../ai-analysis/ai-analysis.repository";
 import { notFound } from "./authoring.shared";
 import { findTeacherAssignment } from "./assignment.repository";
+import { findTeacherQuiz } from "./quiz.repository";
 import {
   countCompletedStages,
   findAssignmentMeta,
+  findQuizMeta,
   findSubmissionForAssignment,
   listActiveStudents,
   listArtifacts,
   listAssignmentSubmissions,
   listCourseOffloading,
   listFactors,
+  listQuizAttemptsWithReflection,
   listStageProgress,
   listTutorTranscript,
   listWritingSignals,
@@ -22,6 +25,7 @@ const LEVELS: OffloadingLevel[] = [
   "3_partial_offloading",
   "4_full_offloading",
 ];
+const RELIANCE_LEVELS: AiRelianceLevel[] = ["none", "low", "moderate", "high"];
 const STAGES = [
   "1_independent_effort",
   "2_guided_questioning",
@@ -144,6 +148,78 @@ export async function getAssignmentAnalytics(userId: string, assignmentId: strin
         averageContribution: Math.round((tally.contribution / tally.students) * 10) / 10,
         example: tally.example,
       })),
+    students: rows,
+  };
+}
+
+// The class view of one quiz: who took it and how each student used the tutor
+// while doing so. This is the light reflection of PRD §5.3A, not the Index, and
+// it carries no score: the attempt's result stays out of this view.
+export async function getQuizAnalytics(userId: string, quizId: string) {
+  if (!(await findTeacherQuiz(userId, quizId))) throw notFound();
+  const meta = await findQuizMeta(quizId);
+  if (!meta) throw notFound();
+
+  const [students, attempts] = await Promise.all([
+    listActiveStudents(meta.courseId),
+    listQuizAttemptsWithReflection(quizId),
+  ]);
+
+  // A student may retry; the class view follows their latest attempt.
+  const latest = new Map<string, (typeof attempts)[number]>();
+  for (const row of attempts) {
+    const seen = latest.get(row.membershipId);
+    if (!seen || row.attemptNumber > seen.attemptNumber) latest.set(row.membershipId, row);
+  }
+
+  const distribution = Object.fromEntries(RELIANCE_LEVELS.map((level) => [level, 0])) as Record<AiRelianceLevel, number>;
+  const counts = { enrolled: students.length, notStarted: 0, inProgress: 0, submitted: 0, reflected: 0 };
+
+  const rows = students.map((student) => {
+    const attempt = latest.get(student.membershipId) ?? null;
+    const status = attempt?.status ?? "not_started";
+    if (status === "not_started") counts.notStarted++;
+    else if (status === "in_progress") counts.inProgress++;
+    else counts.submitted++;
+
+    let reflection = null;
+    if (attempt?.relianceLevel) {
+      counts.reflected++;
+      distribution[attempt.relianceLevel]++;
+      reflection = {
+        relianceLevel: attempt.relianceLevel,
+        studentReport: attempt.studentReport ?? "",
+        recommendations: attempt.recommendations ?? [],
+        promptTurnCount: attempt.promptTurnCount ?? 0,
+        directCount: attempt.directCount ?? 0,
+        hintCount: attempt.hintCount ?? 0,
+        reflectiveCount: attempt.reflectiveCount ?? 0,
+        redirectedCount: attempt.redirectedCount ?? 0,
+        computedAt: iso(attempt.computedAt),
+      };
+    }
+
+    return {
+      membershipId: student.membershipId,
+      name: student.name,
+      attemptNumber: attempt?.attemptNumber ?? null,
+      status,
+      submittedAt: iso(attempt?.submittedAt ?? null),
+      reflection,
+    };
+  });
+
+  return {
+    quiz: {
+      id: meta.id,
+      title: meta.title,
+      status: meta.status,
+      dueAt: iso(meta.dueAt),
+      courseId: meta.courseId,
+      courseName: meta.courseName,
+    },
+    counts,
+    distribution: RELIANCE_LEVELS.map((level) => ({ level, count: distribution[level] })),
     students: rows,
   };
 }

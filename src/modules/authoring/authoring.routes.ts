@@ -23,7 +23,7 @@ import {
   parseResourceEdit,
   parseResourceUpload,
 } from "./authoring.parsers";
-import { getAssignmentAnalytics, getSubmissionProcess } from "./analytics.service";
+import { getAssignmentAnalytics, getQuizAnalytics, getSubmissionProcess } from "./analytics.service";
 import { attachLab, detachLab, labCatalog } from "../labs/labs.service";
 import {
   copyMyAssignment,
@@ -268,6 +268,10 @@ authoringRoutes.post("/courses/:courseId/quizzes", async (context) => {
 
 authoringRoutes.get("/quizzes/:quizId", async (context) =>
   context.json(await getMyQuiz(me(context), param(context, "quizId", "ID kuis"))),
+);
+
+authoringRoutes.get("/quizzes/:quizId/analytics", async (context) =>
+  context.json(await getQuizAnalytics(me(context), param(context, "quizId", "ID kuis"))),
 );
 
 authoringRoutes.patch("/quizzes/:quizId", async (context) => {
