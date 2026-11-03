@@ -3,12 +3,6 @@
 // here must match that registry, and nothing else about a lab lives on the server.
 export const LAB_CATALOG = [
   {
-    key: "bidang-miring",
-    title: "Bidang miring",
-    subject: "Fisika",
-    challenges: ["mulai-meluncur", "pilih-permukaan", "percepatan-dua"],
-  },
-  {
     key: "gerak-parabola",
     title: "Gerak parabola",
     subject: "Fisika",

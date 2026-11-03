@@ -10,7 +10,7 @@ async function courseWithLesson(teacher: Client) {
     status: "published",
   });
   const lesson = await api(teacher, "POST", `/api/manage/modules/${module.body.id}/lessons`, {
-    title: "Gaya pada bidang miring",
+    title: "Gerak parabola",
     content: "Komponen gaya berat sejajar bidang adalah mg sin θ.",
     status: "published",
   });
@@ -21,7 +21,7 @@ async function courseWithLesson(teacher: Client) {
 async function setup() {
   const teacher = await newUser("guru");
   const { course, lessonId } = await courseWithLesson(teacher);
-  const attached = await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "bidang-miring" });
+  const attached = await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "gerak-parabola" });
   expect(attached.status).toBe(201);
   const labId = attached.body.labs[0].id as string;
   const student = await newUser("siswa");
@@ -34,31 +34,31 @@ describe("labs on lessons", () => {
     const teacher = await newUser("guru");
     const { lessonId } = await courseWithLesson(teacher);
     const catalog = await api(teacher, "GET", "/api/manage/labs");
-    expect(catalog.body.labs.map((lab: { key: string }) => lab.key)).toContain("bidang-miring");
+    expect(catalog.body.labs.map((lab: { key: string }) => lab.key)).toContain("gerak-parabola");
 
     expect((await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "tidak-ada" })).status).toBe(400);
-    await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "bidang-miring" });
-    const again = await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "bidang-miring" });
+    await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "gerak-parabola" });
+    const again = await api(teacher, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "gerak-parabola" });
     expect(again.body.labs).toHaveLength(1);
 
     const editor = await api(teacher, "GET", `/api/manage/lessons/${lessonId}`);
-    expect(editor.body.labs).toEqual([{ id: again.body.labs[0].id, labKey: "bidang-miring" }]);
+    expect(editor.body.labs).toEqual([{ id: again.body.labs[0].id, labKey: "gerak-parabola" }]);
     expect(editor.body.labCatalog.length).toBeGreaterThan(0);
 
     const stranger = await newUser("orang-lain");
-    expect((await api(stranger, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "bidang-miring" })).status).toBe(404);
+    expect((await api(stranger, "POST", `/api/manage/lessons/${lessonId}/labs`, { labKey: "gerak-parabola" })).status).toBe(404);
   });
 
   test("a student solves a challenge once for 5 points, and it shows on the lesson and the island", async () => {
     const { student, course, lessonId, labId } = await setup();
     const path = (challenge: string) => `/api/student/labs/${labId}/challenges/${challenge}`;
 
-    expect((await api(student, "POST", path("mulai-meluncur"))).body).toEqual({ points: 5 });
-    expect((await api(student, "POST", path("mulai-meluncur"))).body).toEqual({ points: 0 });
+    expect((await api(student, "POST", path("kenai-benteng"))).body).toEqual({ points: 5 });
+    expect((await api(student, "POST", path("kenai-benteng"))).body).toEqual({ points: 0 });
     expect((await api(student, "POST", path("bukan-tantangan"))).status).toBe(400);
 
     const lesson = await api(student, "GET", `/api/student/lessons/${lessonId}`);
-    expect(lesson.body.labs).toEqual([{ id: labId, labKey: "bidang-miring", solved: ["mulai-meluncur"] }]);
+    expect(lesson.body.labs).toEqual([{ id: labId, labKey: "gerak-parabola", solved: ["kenai-benteng"] }]);
 
     const island = await api(student, "GET", `/api/student/courses/${course.id}/island`);
     expect(island.body.points.total).toBe(5);
@@ -69,9 +69,9 @@ describe("labs on lessons", () => {
   test("only the course's students can solve it, and a used lab cannot be detached", async () => {
     const { teacher, student, labId } = await setup();
     const outsider = await newUser("luar");
-    expect((await api(outsider, "POST", `/api/student/labs/${labId}/challenges/mulai-meluncur`)).status).toBe(404);
+    expect((await api(outsider, "POST", `/api/student/labs/${labId}/challenges/kenai-benteng`)).status).toBe(404);
 
-    await api(student, "POST", `/api/student/labs/${labId}/challenges/pilih-permukaan`);
+    await api(student, "POST", `/api/student/labs/${labId}/challenges/dua-sudut`);
     const detach = await api(teacher, "DELETE", `/api/manage/labs/${labId}`);
     expect(detach.status).toBe(409);
     expect(detach.body.code).toBe("LAB_IN_USE");
