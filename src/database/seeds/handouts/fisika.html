@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Gerak Parabola</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}]});document.fonts.ready.then(()=>document.body.dataset.ready='1')"></script>
+<link rel="stylesheet" href="handout.css">
+</head>
+<body>
+<header>
+  <div><div class="kicker">Fisika · Kelas X</div><h1>Gerak Parabola:<br>Dua Gerak dalam Satu Lintasan</h1></div>
+  <div class="brand">Bernalar</div>
+</header>
+
+<div class="goals"><b>Tujuan belajar.</b> Setelah materi ini kamu dapat (1) memisahkan gerak parabola menjadi gerak mendatar dan gerak tegak, (2) menghitung waktu terbang, tinggi maksimum, dan jangkauan, (3) menjelaskan mengapa dua sudut dapat memberi jangkauan yang sama, dan (4) menjelaskan mengapa massa tidak memengaruhi lintasan bila hambatan udara diabaikan.</div>
+
+<h2>1. Gerak mendatar dan gerak tegak berjalan sendiri-sendiri</h2>
+<p>Bola yang ditendang miring dengan kecepatan awal \(v_0\) dan sudut elevasi \(\theta\) mempunyai dua komponen kecepatan awal:</p>
+<div class="key">\[v_{0x} = v_0\cos\theta \qquad v_{0y} = v_0\sin\theta\]</div>
+<p>Jika hambatan udara diabaikan, <b>tidak ada gaya mendatar</b>, sehingga \(v_x\) tetap sepanjang lintasan. Ke arah tegak, gravitasi menarik ke bawah, sehingga \(v_y\) berkurang \(g\) setiap detik:</p>
+<div class="key">\[x = v_0\cos\theta\; t \qquad y = v_0\sin\theta\; t - \tfrac12 g t^2 \qquad v_y = v_0\sin\theta - g t\]</div>
+<figure>
+<svg viewBox="0 0 520 235" width="500">
+  <line x1="20" y1="170" x2="500" y2="170" stroke="#c9c4dc"/>
+  <path d="M30 170 Q 260 -60 490 170" fill="none" stroke="#6b5ad6" stroke-width="2"/>
+  <g stroke="#4bd29f" stroke-width="2.2" marker-end="url(#a)">
+    <line x1="30" y1="170" x2="80" y2="170"/><line x1="145" y1="85" x2="195" y2="85"/><line x1="260" y1="55" x2="310" y2="55"/><line x1="375" y1="85" x2="425" y2="85"/>
+  </g>
+  <g stroke="#e5484d" stroke-width="2.2" marker-end="url(#b)">
+    <line x1="30" y1="170" x2="30" y2="110"/><line x1="145" y1="85" x2="145" y2="55"/><line x1="375" y1="85" x2="375" y2="115"/><line x1="490" y1="170" x2="490" y2="230"/>
+  </g>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4bd29f"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#e5484d"/></marker>
+  </defs>
+  <g fill="#18153a"><circle cx="30" cy="170" r="4"/><circle cx="145" cy="85" r="4"/><circle cx="260" cy="55" r="4"/><circle cx="375" cy="85" r="4"/></g>
+  <g font-size="10.5"><text x="85" y="165" fill="#0f6b4a">vₓ</text><text x="36" y="118" fill="#e5484d">v<tspan dy="3" font-size="8">y</tspan></text><text x="235" y="42" fill="#18153a">puncak: v<tspan dy="3" font-size="8">y</tspan><tspan dy="-3"> = 0</tspan></text><text x="200" y="190" fill="#5e5e72">vₓ sama panjang di setiap titik</text></g>
+</svg>
+<figcaption>Panah hijau (\(v_x\)) sama panjang di mana pun; panah merah (\(v_y\)) mengecil, nol di puncak, lalu berbalik ke bawah.</figcaption>
+</figure>
+<div class="warn"><b>Salah kaprah:</b> "di titik tertinggi kecepatan bola nol." Yang nol hanya \(v_y\); bola tetap bergerak mendatar dengan \(v_x\). Percepatannya pun tetap \(g\) ke bawah, termasuk di puncak.</div>
+
+<h2>2. Waktu, tinggi, dan jangkauan</h2>
+<p>Untuk benda yang dilempar dan mendarat pada ketinggian yang sama (tanah datar):</p>
+<table>
+  <tr><th>Besaran</th><th>Rumus</th><th>Alasan</th></tr>
+  <tr><td>waktu ke puncak</td><td>\(t_p = \dfrac{v_0\sin\theta}{g}\)</td><td>di puncak \(v_y = 0\)</td></tr>
+  <tr><td>tinggi maksimum</td><td>\(h = \dfrac{(v_0\sin\theta)^2}{2g}\)</td><td>gerak tegak seperti dilempar ke atas</td></tr>
+  <tr><td>waktu terbang</td><td>\(t = \dfrac{2v_0\sin\theta}{g}\)</td><td>naik dan turun sama lama</td></tr>
+  <tr><td>jangkauan</td><td>\(R = \dfrac{v_0^2\sin 2\theta}{g}\)</td><td>\(R = v_x \cdot t\)</td></tr>
+</table>
+<div class="example"><div class="label">Contoh 1</div>Bola ditendang dengan \(v_0 = 20\) m/s pada \(\theta = 30^\circ\) (\(g = 10\) m/s²). Maka \(v_{0y} = 20\sin 30^\circ = 10\) m/s dan \(v_x = 20\cos 30^\circ \approx 17{,}3\) m/s.<br>
+Waktu ke puncak \(t_p = 10/10 = 1\) s, tinggi maksimum \(h = 10^2/20 = 5\) m, waktu terbang 2 s, dan jangkauan \(R = 17{,}3 \times 2 \approx 34{,}6\) m.</div>
+
+<h3>Jangkauan terjauh dan dua sudut kembar</h3>
+<p>Karena \(\sin 2\theta\) paling besar saat \(2\theta = 90^\circ\), jangkauan terjauh di tanah datar dicapai pada \(\theta = 45^\circ\). Selain itu \(\sin 2\theta = \sin(180^\circ - 2\theta)\), sehingga sudut \(\theta\) dan \(90^\circ - \theta\) memberi jangkauan yang <b>sama</b>, misalnya \(30^\circ\) dan \(60^\circ\). Sudut besar membuat bola terbang lebih tinggi dan lebih lama, sudut kecil lebih rendah dan lebih cepat sampai.</p>
+
+<h3>Dilempar dari tempat tinggi</h3>
+<p>Jika benda dilempar mendatar dari ketinggian \(H\), waktu jatuhnya hanya bergantung pada \(H\): \(t = \sqrt{2H/g}\). Kecepatan mendatar hanya menentukan seberapa jauh benda mendarat, \(x = v_x t\).</p>
+<div class="example"><div class="label">Contoh 2</div>Batu dilempar mendatar dengan 8 m/s dari tebing setinggi 20 m. Waktu jatuh \(t = \sqrt{2\cdot 20/10} = 2\) s, dan batu mendarat \(8 \times 2 = 16\) m dari kaki tebing.</div>
+
+<h2>3. Berat atau ringan, sama saja</h2>
+<p>Massa tidak muncul di rumus mana pun. Gaya gravitasi pada bola berat memang lebih besar, tetapi bola berat juga lebih sulit dipercepat; hasilnya percepatan keduanya sama, yaitu \(g\). Tanpa hambatan udara, bola 1 kg dan 5 kg dengan \(v_0\) dan \(\theta\) yang sama menempuh lintasan yang persis sama.</p>
+
+<div class="lab"><div><b>Coba di lab Gerak Parabola.</b> Atur sudut laras dan takaran mesiu, lalu tembak dari atas tebing. Perhatikan kereta kecil di bawah bola: ia selalu tepat di bawah bola karena \(v_x\) tetap.
+<ol><li>Kenai bendera benteng 30 m dari tebing.</li><li>Kenai bendera 24 m dengan dua sudut yang berbeda jauh.</li><li>Tebak dulu: bola 5 kg atau 1 kg yang lebih jauh?</li></ol></div></div>
+
+<h2>Cek pemahaman</h2>
+<ol class="check">
+  <li>Bola dilempar 15 m/s pada sudut \(53^\circ\) (\(\sin 53^\circ = 0{,}8\)). Hitung tinggi maksimumnya.</li>
+  <li>Sebutkan sudut lain yang memberi jangkauan sama dengan \(20^\circ\) pada kecepatan yang sama.</li>
+  <li>Mengapa kereta di lab selalu berada tepat di bawah bola?</li>
+  <li>Sebuah paket dijatuhkan dari pesawat yang terbang mendatar. Di mana posisi paket relatif terhadap pesawat saat jatuh (abaikan hambatan udara)?</li>
+</ol>
+</body>
+</html>

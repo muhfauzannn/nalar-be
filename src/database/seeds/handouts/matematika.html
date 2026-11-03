@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Fungsi Trigonometri: dari Lingkaran ke Gelombang</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}]});document.fonts.ready.then(()=>document.body.dataset.ready='1')"></script>
+<link rel="stylesheet" href="handout.css">
+</head>
+<body>
+<header>
+  <div><div class="kicker">Matematika · Kelas XI</div><h1>Fungsi Trigonometri:<br>dari Lingkaran ke Gelombang</h1></div>
+  <div class="brand">Bernalar</div>
+</header>
+
+<div class="goals"><b>Tujuan belajar.</b> Setelah materi ini kamu dapat (1) menentukan nilai sinus sudut istimewa dan mengubah derajat ke radian, (2) menemukan semua sudut yang memenuhi \(\sin x = k\) pada satu putaran, (3) membaca amplitudo dan periode dari \(y = A\sin bx\), dan (4) menyusun model sinus dari situasi nyata.</div>
+
+<h2>1. Sinus adalah tinggi sebuah titik pada lingkaran</h2>
+<p>Bayangkan sebuah titik yang berputar pada lingkaran berjari-jari 1 dengan pusat di titik asal. Jika titik itu sudah berputar sejauh sudut \(\theta\) dari sumbu-\(x\) positif (berlawanan arah jarum jam), maka koordinatnya adalah \((\cos\theta, \sin\theta)\). Jadi <b>\(\sin\theta\) adalah tinggi titik itu</b> di atas sumbu-\(x\).</p>
+<figure>
+<svg viewBox="0 0 520 190" width="500">
+  <g transform="translate(95 95)" fill="none" stroke="#18153a">
+    <line x1="-85" y1="0" x2="85" y2="0" stroke="#c9c4dc"/><line x1="0" y1="-85" x2="0" y2="85" stroke="#c9c4dc"/>
+    <circle r="70" stroke-width="1.6"/>
+    <line x1="0" y1="0" x2="60.6" y2="-35" stroke-width="1.6"/>
+    <line x1="60.6" y1="-35" x2="60.6" y2="0" stroke="#e5484d" stroke-width="2"/>
+    <path d="M22 0 A22 22 0 0 0 19 -11" stroke="#6b5ad6"/>
+    <circle cx="60.6" cy="-35" r="4" fill="#4bd29f" stroke="#0f6b4a"/>
+    <line x1="60.6" y1="-35" x2="330" y2="-35" stroke="#4bd29f" stroke-dasharray="4 4"/>
+  </g>
+  <text x="122" y="88" font-size="11" fill="#6b5ad6">θ</text>
+  <text x="160" y="80" font-size="11" fill="#e5484d">sin θ</text>
+  <g transform="translate(225 95)" fill="none">
+    <line x1="0" y1="0" x2="280" y2="0" stroke="#c9c4dc"/><line x1="0" y1="-80" x2="0" y2="80" stroke="#c9c4dc"/>
+    <path d="M0 0 C23 -55, 47 -70, 70 -70 C93 -70, 117 -55, 140 0 C163 55, 187 70, 210 70 C233 70, 257 55, 280 0" stroke="#6b5ad6" stroke-width="2"/>
+    <circle cx="140" cy="0" r="0"/>
+    <circle cx="23.3" cy="-35" r="4" fill="#4bd29f" stroke="#0f6b4a"/>
+  </g>
+  <g font-size="10" fill="#5e5e72"><text x="291" y="110">π/2</text><text x="360" y="110">π</text><text x="428" y="110">3π/2</text><text x="497" y="110">2π</text><text x="210" y="30">1</text><text x="205" y="170">−1</text></g>
+</svg>
+<figcaption>Titik pada lingkaran (kiri) dan tingginya digambar terhadap sudut putar (kanan): itulah grafik \(y=\sin\theta\).</figcaption>
+</figure>
+<p>Karena tinggi titik itu berulang setiap satu putaran penuh, grafik sinus juga berulang. Nilai sinus selalu di antara \(-1\) dan \(1\).</p>
+
+<h3>Sudut istimewa dan radian</h3>
+<p>Satu putaran penuh adalah \(360^\circ = 2\pi\) radian, jadi \(180^\circ = \pi\) dan \(1^\circ = \frac{\pi}{180}\) radian.</p>
+<table>
+  <tr><th>\(\theta\)</th><td>\(0^\circ\)</td><td>\(30^\circ\)</td><td>\(45^\circ\)</td><td>\(60^\circ\)</td><td>\(90^\circ\)</td><td>\(150^\circ\)</td><td>\(180^\circ\)</td><td>\(270^\circ\)</td></tr>
+  <tr><th>radian</th><td>0</td><td>\(\frac{\pi}{6}\)</td><td>\(\frac{\pi}{4}\)</td><td>\(\frac{\pi}{3}\)</td><td>\(\frac{\pi}{2}\)</td><td>\(\frac{5\pi}{6}\)</td><td>\(\pi\)</td><td>\(\frac{3\pi}{2}\)</td></tr>
+  <tr><th>\(\sin\theta\)</th><td>0</td><td>\(\frac12\)</td><td>\(\frac12\sqrt2\)</td><td>\(\frac12\sqrt3\)</td><td>1</td><td>\(\frac12\)</td><td>0</td><td>\(-1\)</td></tr>
+</table>
+
+<h2>2. Satu nilai sinus, dua sudut</h2>
+<p>Garis mendatar \(y = k\) (dengan \(-1 < k < 1\)) memotong lingkaran di <b>dua</b> titik. Itu sebabnya persamaan \(\sin x = k\) biasanya punya dua penyelesaian dalam satu putaran:</p>
+<div class="key">\[\sin x = \sin\alpha \;\Longrightarrow\; x = \alpha \;\text{ atau }\; x = 180^\circ - \alpha \quad (0^\circ \le x < 360^\circ)\]</div>
+<div class="example"><div class="label">Contoh 1</div>Tentukan \(x\) pada \(0^\circ \le x \le 360^\circ\) yang memenuhi \(\sin x = \frac12\).<br>
+Karena \(\sin 30^\circ = \frac12\), penyelesaiannya \(x = 30^\circ\) dan \(x = 180^\circ - 30^\circ = 150^\circ\). Di kuadran III dan IV sinus bernilai negatif, jadi tidak ada penyelesaian lain.</div>
+<div class="warn"><b>Salah kaprah yang sering muncul:</b> menjawab hanya \(30^\circ\), atau menjawab \(30^\circ\) dan \(210^\circ\). Ingat: titik di \(210^\circ\) berada <i>di bawah</i> sumbu-\(x\), jadi \(\sin 210^\circ = -\frac12\).</div>
+
+<h2>3. Amplitudo dan periode: \(y = A\sin bx\)</h2>
+<p>Dua bilangan mengubah bentuk gelombang:</p>
+<ul>
+  <li><b>Amplitudo \(|A|\)</b> menentukan tinggi puncak. Nilai maksimum \(y = A\sin bx\) adalah \(|A|\), minimumnya \(-|A|\).</li>
+  <li><b>Bilangan \(b\)</b> menentukan seberapa cepat gelombang berulang. Periodenya \[T = \frac{360^\circ}{b} = \frac{2\pi}{b}.\] Makin besar \(b\), makin pendek periodenya (gelombang makin rapat).</li>
+</ul>
+<figure>
+<svg viewBox="0 0 520 150" width="480">
+  <g transform="translate(30 75)" fill="none">
+    <line x1="0" y1="0" x2="470" y2="0" stroke="#c9c4dc"/><line x1="0" y1="-65" x2="0" y2="65" stroke="#c9c4dc"/>
+    <path d="M0 0 C39 -35, 78 -40, 117.5 -40 C157 -40, 196 -35, 235 0 C274 35, 313 40, 352.5 40 C392 40, 431 35, 470 0" stroke="#c9c4dc" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="M0 0 C19.5 -52, 39 -60, 58.75 -60 C78.5 -60, 98 -52, 117.5 0 C137 52, 156.5 60, 176.25 60 C196 60, 215.5 52, 235 0 C254.5 -52, 274 -60, 293.75 -60 C313.5 -60, 333 -52, 352.5 0 C372 52, 391.5 60, 411.25 60 C431 60, 450.5 52, 470 0" stroke="#6b5ad6" stroke-width="2"/>
+  </g>
+  <g font-size="10" fill="#5e5e72"><text x="258" y="92">180°</text><text x="490" y="92">360°</text><text x="10" y="20">1,5</text><text x="62" y="12" fill="#6b5ad6">y = 1,5 sin 2x</text><text x="330" y="140" fill="#8a8a8f">y = sin x (putus-putus)</text></g>
+</svg>
+<figcaption>\(y=1{,}5\sin 2x\): puncaknya 1,5 dan periodenya \(180^\circ\), jadi ada dua gelombang penuh dalam \(0^\circ\)–\(360^\circ\).</figcaption>
+</figure>
+<div class="example"><div class="label">Contoh 2</div>Untuk \(y = 3\sin 2x\): amplitudo \(= 3\), periode \(= \frac{360^\circ}{2} = 180^\circ\). Nilai maksimum \(3\) dicapai saat \(2x = 90^\circ\), yaitu \(x = 45^\circ\) (dan berulang di \(225^\circ\)).</div>
+<div class="warn"><b>Salah kaprah:</b> mengira periode \(= 360^\circ \times b\). Coba cek dengan \(b=2\): gelombang \(\sin 2x\) jelas berulang <i>lebih cepat</i>, jadi periodenya harus lebih kecil dari \(360^\circ\).</div>
+
+<h2>4. Memodelkan gerak berputar</h2>
+<p>Banyak gerak nyata yang berputar atau berayun bisa dimodelkan dengan sinus: tinggi kursi kincir ria, pasang-surut air laut, atau ayunan bandul. Bentuk umumnya \[h(t) = d + A\sin\!\left(\frac{2\pi}{T}\,t\right),\] dengan \(d\) garis tengah (rata-rata), \(A\) amplitudo, dan \(T\) periode.</p>
+<div class="example"><div class="label">Contoh 3</div>Poros kincir ria berada 22 m di atas tanah, jari-jarinya 20 m, dan satu putaran memerlukan 8 menit. Jika pada \(t = 0\) sebuah kursi tepat setinggi poros dan sedang naik, maka \[h(t) = 22 + 20\sin\!\left(\frac{2\pi}{8}\,t\right) = 22 + 20\sin\!\left(\frac{\pi}{4}\,t\right).\] Tinggi maksimum \(22 + 20 = 42\) m dicapai saat \(\frac{\pi}{4}t = \frac{\pi}{2}\), yaitu \(t = 2\) menit.</div>
+
+<div class="lab"><div><b>Coba di lab Mesin Gelombang.</b> Engkol memutar roda; pasak pada roda naik-turun, dan pena di papan grafik selalu setinggi pasak.
+<ol><li>Putar engkol dan tandai <i>semua</i> sudut saat \(y = 0{,}5\).</li><li>Pasang roda gigi 2× dan temukan saat gelombang mulai berulang.</li><li>Tiru gelombang ungu dengan mengatur jarak pasak dan roda gigi.</li></ol></div></div>
+
+<h2>Cek pemahaman</h2>
+<ol class="check">
+  <li>Tentukan semua \(x\) pada \(0^\circ \le x \le 360^\circ\) yang memenuhi \(\sin x = \frac12\sqrt3\).</li>
+  <li>Tentukan amplitudo dan periode \(y = 4\sin 3x\). Berapa banyak puncak pada \(0^\circ \le x \le 360^\circ\)?</li>
+  <li>Tulis fungsi sinus dengan amplitudo 2 dan periode \(\pi\).</li>
+  <li>Pada Contoh 3, kapan pertama kali kursi berada 32 m di atas tanah?</li>
+</ol>
+</body>
+</html>

@@ -26,7 +26,7 @@ try {
   const owner = await resolveOwner();
   const results = await seedCoreCourses(owner.id);
   for (const result of results) {
-    console.log(`${result.created ? "Dibuat" : "Sudah ada, dibiarkan"}: ${result.name} — /courses/${result.courseId} · latihan /quizzes/${result.quizId}`);
+    console.log(`${result.created ? "Dibuat" : "Sudah ada, dibiarkan"}: ${result.name} — /courses/${result.courseId} · latihan /quizzes/${result.quizId} · tugas /assignments/${result.assignmentId}${result.handoutAdded ? " · PDF materi ditambahkan" : ""}`);
   }
   process.exit(0);
 } catch (error) {

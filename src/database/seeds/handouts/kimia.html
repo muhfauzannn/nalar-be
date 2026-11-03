@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Laju Reaksi dan Teori Tumbukan</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}]});document.fonts.ready.then(()=>document.body.dataset.ready='1')"></script>
+<link rel="stylesheet" href="handout.css">
+</head>
+<body>
+<header>
+  <div><div class="kicker">Kimia · Kelas XI</div><h1>Laju Reaksi dan<br>Teori Tumbukan</h1></div>
+  <div class="brand">Bernalar</div>
+</header>
+
+<div class="goals"><b>Tujuan belajar.</b> Setelah materi ini kamu dapat (1) menjelaskan syarat tumbukan efektif, (2) menjelaskan pengaruh suhu, konsentrasi, luas permukaan, dan katalis terhadap laju reaksi dengan teori tumbukan, (3) menghitung perubahan laju bila laju berlipat dua setiap kenaikan 10 °C, dan (4) membaca diagram energi dengan dan tanpa katalis.</div>
+
+<h2>1. Tidak semua tumbukan menghasilkan reaksi</h2>
+<p>Partikel-partikel pereaksi selalu bergerak acak dan saling bertumbukan, bahkan miliaran kali setiap detik. Namun hanya sebagian kecil tumbukan yang berubah menjadi reaksi, yaitu <b>tumbukan efektif</b>:</p>
+<ul>
+  <li>energinya paling sedikit sebesar <b>energi aktivasi \(E_a\)</b>, energi minimum untuk memutus ikatan lama, dan</li>
+  <li>arah (orientasi) tumbukannya tepat.</li>
+</ul>
+<p>Jadi laju reaksi bergantung pada dua hal: <b>seberapa sering</b> partikel bertumbukan, dan <b>berapa bagian</b> dari tumbukan itu yang cukup bertenaga.</p>
+
+<h2>2. Empat faktor yang mengubah laju</h2>
+<table>
+  <tr><th>Faktor</th><th>Yang berubah</th><th>Alasan menurut teori tumbukan</th></tr>
+  <tr><td>Konsentrasi naik</td><td>frekuensi tumbukan</td><td>lebih banyak partikel dalam volume yang sama</td></tr>
+  <tr><td>Luas permukaan naik</td><td>frekuensi tumbukan</td><td>serbuk: lebih banyak partikel di permukaan yang dapat disentuh</td></tr>
+  <tr><td>Suhu naik</td><td>bagian tumbukan yang \(\ge E_a\)</td><td>partikel lebih cepat; jauh lebih banyak yang energinya melewati \(E_a\)</td></tr>
+  <tr><td>Katalis</td><td>\(E_a\) turun</td><td>jalur reaksi lain dengan puncak energi lebih rendah</td></tr>
+</table>
+
+<h3>Mengapa suhu berpengaruh sangat besar</h3>
+<p>Kenaikan suhu dari 300 K ke 310 K hanya membuat partikel sekitar 2% lebih cepat, sehingga tumbukan hanya sedikit lebih sering. Tetapi bagian partikel yang energinya melewati \(E_a\) bisa berlipat dua. Itulah sebabnya untuk banyak reaksi berlaku aturan praktis: <b>setiap naik 10 °C, laju menjadi sekitar 2 kali</b>.</p>
+<figure>
+<svg viewBox="0 0 500 175" width="460">
+  <line x1="30" y1="150" x2="480" y2="150" stroke="#18153a"/><line x1="30" y1="150" x2="30" y2="15" stroke="#18153a"/>
+  <path d="M30 150 C60 150, 80 30, 130 30 C190 30, 260 120, 480 146" fill="none" stroke="#6b5ad6" stroke-width="2"/>
+  <path d="M30 150 C70 150, 100 62, 160 62 C230 62, 300 115, 480 140" fill="none" stroke="#e5484d" stroke-width="2"/>
+  <line x1="330" y1="20" x2="330" y2="150" stroke="#18153a" stroke-dasharray="4 3"/>
+  <path d="M330 106 C370 120, 420 134, 480 140 L480 150 L330 150 Z" fill="#e5484d" fill-opacity="0.25"/>
+  <path d="M330 128 C370 135, 420 142, 480 146 L480 150 L330 150 Z" fill="#6b5ad6" fill-opacity="0.35"/>
+  <g font-size="10.5"><text x="336" y="30" fill="#18153a">Ea</text><text x="120" y="22" fill="#6b5ad6">suhu rendah</text><text x="172" y="84" fill="#e5484d">suhu tinggi</text><text x="360" y="100" fill="#5e5e72">cukup energi</text><text x="200" y="168" fill="#5e5e72">energi partikel →</text><text x="2" y="80" fill="#5e5e72" transform="rotate(-90 12 80)">jumlah partikel</text></g>
+</svg>
+<figcaption>Sebaran energi partikel. Pada suhu tinggi, luas daerah di kanan \(E_a\) (partikel yang cukup energi) jauh lebih besar.</figcaption>
+</figure>
+<div class="example"><div class="label">Contoh 1</div>Laju suatu reaksi pada 25 °C adalah \(v\), dan laju berlipat dua setiap naik 10 °C. Pada 55 °C suhu naik \(30\) °C, yaitu tiga kali kenaikan 10 °C, sehingga laju menjadi \(2^3 v = 8v\). Jika reaksi itu selesai dalam 40 s pada 25 °C, pada 55 °C ia selesai dalam \(40/8 = 5\) s.</div>
+<div class="warn"><b>Salah kaprah:</b> "naik 30 °C berarti 6 kali lebih cepat" (dikira \(2 \times 3\)). Kenaikan berlipat <i>berulang</i>: \(2 \times 2 \times 2\).</div>
+
+<h2>3. Katalis membuka jalan pintas</h2>
+<p>Katalis menyediakan jalur reaksi lain dengan energi aktivasi lebih rendah. Pada suhu yang sama, jauh lebih banyak tumbukan yang kini cukup bertenaga. Katalis ikut dalam tahap reaksi tetapi terbentuk kembali di akhir, sehingga <b>massanya tetap</b> dan ia tidak mengubah energi pereaksi, energi hasil, maupun \(\Delta H\).</p>
+<figure>
+<svg viewBox="0 0 460 170" width="420">
+  <line x1="30" y1="155" x2="440" y2="155" stroke="#18153a"/><line x1="30" y1="155" x2="30" y2="10" stroke="#18153a"/>
+  <path d="M40 110 H110 C150 110, 170 25, 220 25 C270 25, 290 130, 330 130 H430" fill="none" stroke="#18153a" stroke-width="2"/>
+  <path d="M110 110 C150 110, 175 70, 220 70 C265 70, 290 130, 330 130" fill="none" stroke="#14a06f" stroke-width="2" stroke-dasharray="5 3"/>
+  <line x1="220" y1="110" x2="220" y2="27" stroke="#e5484d" stroke-dasharray="3 3"/>
+  <line x1="240" y1="110" x2="240" y2="72" stroke="#14a06f" stroke-dasharray="3 3"/>
+  <line x1="110" y1="110" x2="250" y2="110" stroke="#c9c4dc" stroke-dasharray="2 3"/>
+  <g font-size="10.5"><text x="45" y="104" fill="#18153a">pereaksi</text><text x="360" y="124" fill="#18153a">hasil</text><text x="226" y="62" fill="#e5484d">Ea</text><text x="246" y="104" fill="#14a06f">Ea katalis</text><text x="200" y="168" fill="#5e5e72">jalannya reaksi →</text><text x="2" y="85" fill="#5e5e72" transform="rotate(-90 12 85)">energi</text></g>
+</svg>
+<figcaption>Diagram energi tanpa katalis (hitam) dan dengan katalis (hijau). Titik awal dan akhir sama, hanya puncaknya yang turun.</figcaption>
+</figure>
+<p>Di dalam tubuh, enzim adalah katalis. Tanpa enzim, banyak reaksi pencernaan akan berlangsung terlalu lambat pada suhu tubuh.</p>
+
+<div class="lab"><div><b>Coba di lab Reaktor Tumbukan.</b> Kilatan kuning adalah tumbukan yang berhasil; cincin abu-abu adalah tumbukan yang hanya memantul. Kartu energi menunjukkan berapa banyak tumbukan yang cukup energi.
+<ol><li>Buat reaksi 2× lebih cepat hanya dengan memutar pemanas.</li><li>Tebak dulu: setelah reaksi, katalis 2,0 g habis atau tetap?</li><li>Capai laju 12× atau lebih tanpa melewati 310 K.</li></ol></div></div>
+
+<h2>Cek pemahaman</h2>
+<ol class="check">
+  <li>Mengapa serbuk pualam bereaksi lebih cepat dengan HCl daripada bongkahan bermassa sama?</li>
+  <li>Laju reaksi berlipat dua tiap naik 10 °C. Jika pada 20 °C reaksi selesai dalam 80 s, berapa lama pada 50 °C?</li>
+  <li>Jelaskan dengan diagram energi mengapa katalis tidak mengubah \(\Delta H\).</li>
+  <li>Susu cepat basi di suhu kamar tetapi tahan lama di kulkas. Jelaskan dengan teori tumbukan.</li>
+</ol>
+</body>
+</html>

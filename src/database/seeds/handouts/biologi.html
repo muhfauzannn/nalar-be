@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Transpor Membran dan Osmosis</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}]});document.fonts.ready.then(()=>document.body.dataset.ready='1')"></script>
+<link rel="stylesheet" href="handout.css">
+</head>
+<body>
+<header>
+  <div><div class="kicker">Biologi · Kelas XI</div><h1>Transpor Membran:<br>Ke Mana Air Bergerak?</h1></div>
+  <div class="brand">Bernalar</div>
+</header>
+
+<div class="goals"><b>Tujuan belajar.</b> Setelah materi ini kamu dapat (1) membedakan difusi dan osmosis, (2) menentukan arah gerak air antara sel dan larutan, (3) memprediksi keadaan sel hewan dan sel tumbuhan dalam larutan hipotonis, isotonis, dan hipertonis, dan (4) menafsirkan data percobaan osmosis untuk memperkirakan kepekatan cairan sel.</div>
+
+<h2>1. Membran yang memilih</h2>
+<p>Membran sel bersifat <b>semipermeabel</b>: air dapat melewatinya dengan mudah, tetapi banyak zat terlarut, seperti ion garam dan gula, tidak dapat melintas bebas. Dua jenis transpor pasif yang perlu dibedakan:</p>
+<ul>
+  <li><b>Difusi</b>: perpindahan zat terlarut dari daerah berkonsentrasi tinggi ke daerah berkonsentrasi rendah.</li>
+  <li><b>Osmosis</b>: perpindahan <b>air</b> melalui membran semipermeabel dari larutan yang lebih encer ke larutan yang lebih pekat.</li>
+</ul>
+<div class="key">Air bergerak menuju sisi yang <b>lebih asin</b> (lebih pekat zat terlarutnya), sampai kepekatan kedua sisi seimbang atau sampai ditahan tekanan.</div>
+
+<h2>2. Hipotonis, isotonis, hipertonis</h2>
+<p>Istilah ini selalu dibandingkan <i>terhadap cairan sel</i>:</p>
+<table>
+  <tr><th>Larutan di luar sel</th><th>Arah air</th><th>Sel hewan (darah merah)</th><th>Sel tumbuhan</th></tr>
+  <tr><td><b>Hipotonis</b> (lebih encer)</td><td>masuk ke sel</td><td>menggembung, lalu pecah (hemolisis)</td><td>tegang/turgid, tidak pecah</td></tr>
+  <tr><td><b>Isotonis</b> (sama pekat)</td><td>masuk = keluar</td><td>tetap normal</td><td>normal (agak lembek)</td></tr>
+  <tr><td><b>Hipertonis</b> (lebih pekat)</td><td>keluar dari sel</td><td>mengkerut (krenasi)</td><td>membran lepas dari dinding (plasmolisis)</td></tr>
+</table>
+<figure>
+<svg viewBox="0 0 500 175" width="470">
+  <g transform="translate(85 70)">
+    <circle r="44" fill="#f2a1a4" stroke="#a8323a" stroke-width="1.5"/>
+    <g stroke="#2f7fe0" stroke-width="2" marker-end="url(#w)"><line x1="-75" y1="0" x2="-50" y2="0"/><line x1="75" y1="0" x2="50" y2="0"/><line x1="0" y1="-70" x2="0" y2="-50"/></g>
+  </g>
+  <g transform="translate(250 70)">
+    <ellipse rx="36" ry="33" fill="#e2545a" stroke="#a8323a" stroke-width="1.5"/><ellipse rx="15" ry="13" fill="#f8c2c4"/>
+    <g stroke="#2f7fe0" stroke-width="2" marker-end="url(#w)"><line x1="-66" y1="-6" x2="-44" y2="-6"/><line x1="-44" y1="6" x2="-66" y2="6"/><line x1="44" y1="-6" x2="66" y2="-6"/><line x1="66" y1="6" x2="44" y2="6"/></g>
+  </g>
+  <g transform="translate(415 70)">
+    <path d="M0 -26 L6 -30 L10 -22 L18 -24 L18 -14 L27 -10 L22 -2 L28 6 L20 10 L20 20 L10 18 L6 27 L-1 22 L-8 28 L-12 19 L-21 20 L-20 11 L-28 6 L-22 -2 L-27 -10 L-18 -14 L-18 -24 L-9 -22 L-6 -30 Z" fill="#c23b42" stroke="#8a2228" stroke-width="1.2"/>
+    <g stroke="#2f7fe0" stroke-width="2" marker-end="url(#w)"><line x1="-32" y1="0" x2="-58" y2="0"/><line x1="32" y1="0" x2="58" y2="0"/><line x1="0" y1="-36" x2="0" y2="-60"/></g>
+  </g>
+  <defs><marker id="w" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7fe0"/></marker></defs>
+  <g font-size="10.5" text-anchor="middle"><text x="85" y="150">hipotonis (air suling)</text><text x="85" y="164" fill="#5e5e72">air masuk → pecah</text><text x="250" y="150">isotonis (NaCl 0,9 %)</text><text x="250" y="164" fill="#5e5e72">seimbang</text><text x="415" y="150">hipertonis (NaCl 3 %)</text><text x="415" y="164" fill="#5e5e72">air keluar → krenasi</text></g>
+</svg>
+<figcaption>Sel darah merah dalam tiga larutan. Panah biru menunjukkan gerak bersih air.</figcaption>
+</figure>
+<div class="warn"><b>Salah kaprah:</b> "dalam larutan pekat, garam masuk ke sel." Yang bergerak adalah air, keluar dari sel. Dan dalam larutan isotonis air tidak berhenti bergerak; hanya saja yang masuk sama dengan yang keluar.</div>
+
+<h3>Mengapa sel tumbuhan tidak pecah?</h3>
+<p>Sel tumbuhan dikelilingi <b>dinding sel</b> yang kaku. Saat air masuk, vakuola membesar dan menekan dinding (tekanan turgor), tetapi dinding menahannya. Sel menjadi tegang: itulah sebabnya sayuran yang direndam air menjadi renyah. Sebaliknya, dalam larutan pekat protoplas mengecil dan menjauh dari dinding: <b>plasmolisis</b>. Sayur yang ditaburi garam pun menjadi layu.</p>
+
+<h2>3. Membaca data percobaan</h2>
+<p>Potongan kentang yang sama ukurannya direndam 1 jam dalam larutan NaCl berbagai kadar, lalu ditimbang:</p>
+<table>
+  <tr><th>Kadar NaCl (%)</th><td>0</td><td>0,5</td><td>1,0</td><td>1,5</td><td>2,0</td><td>3,0</td></tr>
+  <tr><th>Perubahan massa (%)</th><td>+12</td><td>+6</td><td>+1</td><td>−4</td><td>−9</td><td>−15</td></tr>
+</table>
+<div class="example"><div class="label">Contoh</div>Massa naik berarti air masuk (larutan hipotonis); massa turun berarti air keluar (hipertonis). Perubahan massa nol terjadi di antara 1,0 % dan 1,5 %. Dengan menarik garis lurus antara \((1{,}0;\,+1)\) dan \((1{,}5;\,-4)\), nol dicapai sekitar \(1{,}0 + \frac{1}{5}\times 0{,}5 = 1{,}1\) %. Jadi cairan sel kentang kira-kira isotonis dengan NaCl 1,1 %.</div>
+
+<div class="lab"><div><b>Coba di lab Mikroskop Osmosis.</b> Geser cincin pada pipet untuk memilih kadar garam, teteskan, lalu amati sel melalui lensa. Panah biru menunjukkan arah air, titik kuning adalah garam.
+<ol><li>Tebak dulu ke mana air bergerak saat sel darah ditetesi air suling.</li><li>Cari kadar garam yang membuat sel darah tetap utuh.</li><li>Buat membran sel bawang merah lepas dari dindingnya.</li></ol></div></div>
+
+<h2>Cek pemahaman</h2>
+<ol class="check">
+  <li>Mengapa cairan infus harus isotonis dengan darah?</li>
+  <li>Ikan air tawar dimasukkan ke air laut. Apa yang terjadi pada sel-selnya, dan mengapa?</li>
+  <li>Pada data kentang di atas, mengapa massa pada 3,0 % turun lebih banyak daripada pada 1,5 %?</li>
+  <li>Bagaimana kamu membuktikan bahwa plasmolisis dapat dipulihkan (deplasmolisis)?</li>
+</ol>
+</body>
+</html>

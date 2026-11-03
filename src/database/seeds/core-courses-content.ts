@@ -1,10 +1,22 @@
-const math = String.raw;
+// LaTeX needs raw backslashes, but Bun's String.raw returns a non-ASCII character
+// (°, −, ×, θ) as the text "\u00B0", so the escapes are turned back into characters.
+const math = (strings: TemplateStringsArray, ...values: unknown[]) =>
+  String.raw({ raw: strings.raw.map((part) => part.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))) }, ...values);
 
 // The four core Bernalar courses: one SMA topic each, taught by one lab and
 // practised with an untimed quiz. Wrong options are the common misconceptions
 // for that topic, so a wrong pick tells the teacher what to talk about.
 
 export type CoreQuestion = { prompt: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3; explanation: string };
+
+/** A NALAR scenario assignment: worked alone first, then with the AI tutor, AI feedback, revision and reflection. */
+export type CoreAssignment = {
+  scenarioTitle: string;
+  scenarioInstructions: string;
+  title: string;
+  instructions: string;
+  criteria: Array<[label: string, description: string, maxPoints: string]>;
+};
 
 export type CoreCourse = {
   key: "matematika" | "fisika" | "kimia" | "biologi";
@@ -14,6 +26,9 @@ export type CoreCourse = {
   module: { title: string; description: string };
   lesson: { title: string; content: string };
   labKey: string;
+  /** The lesson's PDF handout in ./handouts (built by handouts/build.mjs); the PDF tutor reads it. */
+  handout: { file: string; title: string; content: string };
+  assignment: CoreAssignment;
   quizTitle: string;
   quizInstructions: string;
   questions: CoreQuestion[];
@@ -37,6 +52,26 @@ Dua hal mengubah bentuk gelombang. Amplitudo \(A\) menentukan tinggi puncak. Bil
 Di lab, putar engkol dan perhatikan garis putus-putus yang menghubungkan pasak dengan pena: keduanya selalu sama tinggi. Selesaikan tiga misi: temukan semua sudut dengan \(\sin\theta=\frac12\), temukan periode saat roda gigi 2×, lalu tiru gelombang ungu.`,
     },
     labKey: "mesin-gelombang",
+    handout: { file: "matematika.pdf", title: "Materi: Fungsi Trigonometri", content: "Ringkasan materi, contoh soal, dan latihan. Buka AI Tutor untuk bertanya tentang isi PDF ini." },
+    assignment: {
+      scenarioTitle: "Memodelkan Kincir Ria",
+      scenarioInstructions: math`Bangun model sinus dari gerak berputar, gunakan untuk menjawab pertanyaan waktu dan tinggi, lalu periksa kewajaran jawabanmu.`,
+      title: "Tugas Nalar: Model Kincir Ria",
+      instructions: math`Sebuah kincir ria berjari-jari 20 m dengan poros 22 m di atas tanah. Satu putaran memerlukan 8 menit. Pada \(t=0\) sebuah kursi tepat setinggi poros dan sedang naik.
+
+1. Tulis fungsi tinggi kursi \(h(t)\) (dalam meter, \(t\) dalam menit) dan jelaskan arti setiap bilangan di dalamnya.
+2. Tentukan semua waktu dalam satu putaran pertama saat kursi berada 32 m di atas tanah.
+3. Berapa lama dalam satu putaran kursi berada di atas 32 m?
+4. Jika kincir diperlambat sehingga satu putaran menjadi 12 menit, bagian mana dari fungsimu yang berubah, dan bagaimana jawaban nomor 3 berubah?
+
+Kerjakan sendiri dulu, lalu diskusikan dengan AI Tutor. Tuliskan langkah, bukan hanya jawaban akhir.`,
+      criteria: [
+        ["Model fungsi", "Fungsi h(t) tepat, dan arti amplitudo, garis tengah, serta periode dijelaskan dengan konteks kincir.", "25.00"],
+        ["Penalaran sudut dan waktu", "Semua penyelesaian dalam satu putaran ditemukan, termasuk penyelesaian kedua dari sin x = k.", "35.00"],
+        ["Ketepatan dan verifikasi", "Perhitungan benar, satuan konsisten, dan hasil diperiksa dengan grafik atau substitusi.", "25.00"],
+        ["Refleksi", "Menjelaskan apa yang dipelajari dan menilai jujur bantuan AI yang dipakai.", "15.00"],
+      ],
+    },
     quizTitle: "Latihan Fungsi Trigonometri",
     quizInstructions: untimed,
     questions: [
@@ -67,6 +102,26 @@ Di tanah datar, jangkauan \(R=\frac{v_0^2\sin2\theta}{g}\) terbesar pada \(45^\c
 Di lab, atur sudut laras dan takaran mesiu, lalu tembak. Perhatikan kereta kecil di bawah bola: ia bergerak dengan kecepatan tetap, tepat di bawah bola sepanjang terbang.`,
     },
     labKey: "gerak-parabola",
+    handout: { file: "fisika.pdf", title: "Materi: Gerak Parabola", content: "Ringkasan materi, contoh soal, dan latihan. Buka AI Tutor untuk bertanya tentang isi PDF ini." },
+    assignment: {
+      scenarioTitle: "Merancang Air Mancur Taman",
+      scenarioInstructions: math`Gunakan gerak parabola untuk merancang lintasan air, bandingkan dua pilihan sudut, dan nilai asumsi model.`,
+      title: "Tugas Nalar: Air Mancur Taman",
+      instructions: math`Sebuah nosel air mancur berada di tepi kolam, setinggi permukaan air, dan menyemprot dengan kecepatan 10 m/s. Air harus jatuh tepat di patung yang berjarak 5 m dari nosel. Gunakan \(g=10\) m/s² dan abaikan hambatan udara.
+
+1. Tentukan dua sudut semprotan yang membuat air mengenai patung. Tunjukkan langkahmu.
+2. Untuk kedua sudut itu, hitung tinggi maksimum air dan lama air di udara.
+3. Taman ingin semburan air terlihat setinggi mungkin, tetapi ada dahan pohon 3 m di atas kolam. Sudut mana yang kamu pilih? Jelaskan.
+4. Sebutkan satu asumsi dalam model ini yang tidak sepenuhnya benar di dunia nyata dan bagaimana pengaruhnya pada hasil.
+
+Kerjakan sendiri dulu, lalu diskusikan dengan AI Tutor. Tuliskan langkah, bukan hanya jawaban akhir.`,
+      criteria: [
+        ["Penguraian gerak", "Gerak dipisahkan menjadi komponen mendatar dan tegak dengan benar.", "25.00"],
+        ["Strategi dan dua sudut", "Kedua sudut ditemukan dengan alasan yang jelas (θ dan 90° − θ).", "30.00"],
+        ["Perhitungan dan keputusan", "Tinggi, waktu, dan pilihan sudut dihitung benar dan dikaitkan dengan batas dahan.", "30.00"],
+        ["Asumsi dan refleksi", "Asumsi model dinilai kritis dan penggunaan AI direfleksikan dengan jujur.", "15.00"],
+      ],
+    },
     quizTitle: "Latihan Gerak Parabola",
     quizInstructions: `${untimed} Gunakan g = 10 m/s² dan abaikan hambatan udara.`,
     questions: [
@@ -97,6 +152,26 @@ Menaikkan suhu membuat jauh lebih banyak tumbukan cukup bertenaga; untuk banyak 
 Di lab, putar kenop pemanas, tekan pompa larutan, dan celupkan keranjang katalis. Kilatan kuning adalah tumbukan yang berhasil; jarum pada pengukur menunjukkan laju dibanding campuran awal.`,
     },
     labKey: "reaktor-tumbukan",
+    handout: { file: "kimia.pdf", title: "Materi: Laju Reaksi dan Teori Tumbukan", content: "Ringkasan materi, contoh soal, dan latihan. Buka AI Tutor untuk bertanya tentang isi PDF ini." },
+    assignment: {
+      scenarioTitle: "Mengapa Makanan Cepat Basi?",
+      scenarioInstructions: math`Hubungkan suhu, konsentrasi, dan katalis dengan laju reaksi pembusukan, lalu hitung dan nilai prediksimu.`,
+      title: "Tugas Nalar: Susu di Kulkas",
+      instructions: math`Susu segar mulai basi setelah sekitar 8 jam pada suhu kamar 25 °C. Pembusukan disebabkan reaksi yang dipercepat enzim dari bakteri. Anggap laju pembusukan menjadi 2 kali setiap kenaikan 10 °C.
+
+1. Perkirakan berapa lama susu bertahan di kulkas bersuhu 5 °C. Tunjukkan langkahmu.
+2. Jelaskan dengan teori tumbukan mengapa suhu rendah memperlambat pembusukan. Sebutkan peran energi aktivasi.
+3. Enzim bakteri berperan sebagai katalis. Jelaskan dengan diagram energi bagaimana enzim mempercepat pembusukan.
+4. Kenyataannya susu di kulkas bisa bertahan lebih lama dari perkiraanmu. Sebutkan satu alasan yang mungkin.
+
+Kerjakan sendiri dulu, lalu diskusikan dengan AI Tutor. Tuliskan langkah, bukan hanya jawaban akhir.`,
+      criteria: [
+        ["Perhitungan laju", "Kelipatan laju untuk penurunan 20 °C dihitung dengan benar (dua kali faktor 2).", "25.00"],
+        ["Penjelasan teori tumbukan", "Menghubungkan suhu dengan bagian tumbukan yang energinya melampaui Ea.", "30.00"],
+        ["Katalis dan diagram energi", "Peran enzim sebagai katalis dijelaskan dengan diagram energi yang tepat.", "30.00"],
+        ["Kewajaran dan refleksi", "Batas model dinilai dan penggunaan AI direfleksikan dengan jujur.", "15.00"],
+      ],
+    },
     quizTitle: "Latihan Laju Reaksi",
     quizInstructions: untimed,
     questions: [
@@ -123,6 +198,33 @@ Di lab, putar kenop pemanas, tekan pompa larutan, dan celupkan keranjang katalis
       content: "Membran sel dapat dilewati air, tetapi tidak oleh banyak zat terlarut seperti garam. Karena itu, air berpindah dari larutan yang lebih encer (hipotonis) ke larutan yang lebih pekat (hipertonis). Perpindahan air melalui membran semipermeabel ini disebut osmosis.\n\nSel darah merah tidak memiliki dinding. Dalam larutan hipotonis, sel menggembung lalu pecah (hemolisis); dalam larutan hipertonis, sel mengkerut (krenasi). Larutan NaCl 0,9 % bersifat isotonis: air masuk dan keluar sama banyak. Sel tumbuhan memiliki dinding sel, sehingga dalam air ia menjadi tegang (turgid) tanpa pecah, dan dalam larutan pekat membrannya lepas dari dinding (plasmolisis).\n\nDi lab, geser cincin pada pipet untuk memilih kadar garam, teteskan ke kaca preparat, lalu amati melalui lensa. Panah biru menunjukkan arah air.",
     },
     labKey: "mikroskop-osmosis",
+    handout: { file: "biologi.pdf", title: "Materi: Transpor Membran dan Osmosis", content: "Ringkasan materi, contoh soal, dan latihan. Buka AI Tutor untuk bertanya tentang isi PDF ini." },
+    assignment: {
+      scenarioTitle: "Menyelidiki Cairan Sel Wortel",
+      scenarioInstructions: math`Rancang dan tafsirkan percobaan osmosis untuk memperkirakan kepekatan cairan sel.`,
+      title: "Tugas Nalar: Percobaan Potongan Wortel",
+      instructions: math`Potongan wortel yang sama ukurannya direndam 1 jam dalam larutan garam berbagai kadar. Hasil penimbangannya:
+
+- NaCl 0 %: massa +10 %
+- NaCl 0,4 %: massa +6 %
+- NaCl 0,8 %: massa +2 %
+- NaCl 1,2 %: massa −2 %
+- NaCl 1,6 %: massa −6 %
+- NaCl 2,0 %: massa −9 %
+
+1. Pada kadar berapa saja larutan bersifat hipotonis dan hipertonis bagi sel wortel? Jelaskan dari data.
+2. Perkirakan kadar NaCl yang isotonis dengan cairan sel wortel. Tunjukkan caramu.
+3. Gambarkan atau jelaskan keadaan sel wortel (dinding, membran, vakuola) pada 0 % dan pada 2,0 %.
+4. Sebutkan dua variabel yang harus dijaga sama agar percobaan ini adil.
+
+Kerjakan sendiri dulu, lalu diskusikan dengan AI Tutor. Tuliskan langkah, bukan hanya jawaban akhir.`,
+      criteria: [
+        ["Membaca data", "Arah gerak air dan sifat larutan disimpulkan dengan benar dari perubahan massa.", "25.00"],
+        ["Penalaran isotonis", "Kadar isotonis diperkirakan dengan cara yang dapat diperiksa (interpolasi atau grafik).", "30.00"],
+        ["Penjelasan sel", "Turgor dan plasmolisis dijelaskan dengan peran dinding, membran, dan vakuola.", "30.00"],
+        ["Desain percobaan dan refleksi", "Variabel kontrol tepat dan penggunaan AI direfleksikan dengan jujur.", "15.00"],
+      ],
+    },
     quizTitle: "Latihan Osmosis",
     quizInstructions: untimed,
     questions: [
