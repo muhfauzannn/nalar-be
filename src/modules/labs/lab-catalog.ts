@@ -8,6 +8,30 @@ export const LAB_CATALOG = [
     subject: "Fisika",
     challenges: ["mulai-meluncur", "pilih-permukaan", "percepatan-dua"],
   },
+  {
+    key: "gerak-parabola",
+    title: "Gerak parabola",
+    subject: "Fisika",
+    challenges: ["kenai-benteng", "dua-sudut", "berat-ringan"],
+  },
+  {
+    key: "mesin-gelombang",
+    title: "Mesin gelombang",
+    subject: "Matematika",
+    challenges: ["dua-sudut-setengah", "periode-dua-kali", "tiru-gelombang"],
+  },
+  {
+    key: "reaktor-tumbukan",
+    title: "Reaktor tumbukan",
+    subject: "Kimia",
+    challenges: ["gandakan-suhu", "katalis-tetap", "cepat-tapi-aman"],
+  },
+  {
+    key: "mikroskop-osmosis",
+    title: "Mikroskop osmosis",
+    subject: "Biologi",
+    challenges: ["air-ke-mana", "cari-isotonis", "plasmolisis"],
+  },
 ] as const;
 
 export type LabKey = (typeof LAB_CATALOG)[number]["key"];

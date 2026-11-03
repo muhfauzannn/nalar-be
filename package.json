@@ -13,6 +13,7 @@
     "db:reset": "bun run src/database/reset.ts",
     "db:seed": "bun run src/database/seed.ts",
     "db:seed:science": "bun run src/database/seed-science.ts",
+    "db:seed:core": "bun run src/database/seed-core.ts",
     "db:studio": "drizzle-kit studio",
     "storage:check": "bun run src/scripts/storage-check.ts",
     "tutor:smoke": "bun src/scripts/pdf-tutor-smoke.ts"
