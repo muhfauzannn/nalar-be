@@ -33,7 +33,44 @@ export const TUTOR_PERSONA = `GAYA BICARA:
   candaan dan jadi penyemangat yang tulus dulu.
 - Lucu tidak berarti asal: istilah, rumus, dan penjelasan tetap tepat.`;
 
-export function assessmentTutorConfig(systemInstruction: string): LiveConnectConfig {
+/**
+ * The lab tutor's second tool: points at a part of the machine on the student's screen,
+ * each step when its first words are spoken (the PDF tutor's plan-then-say pattern).
+ */
+function pointAtLabPart(labParts: readonly string[]) {
+  return {
+    name: "point_at_lab_part",
+    behavior: Behavior.BLOCKING,
+    description: "Menunjuk bagian alat lab di layar siswa, tepat saat kamu menyebutnya. Panggil SEKALI per jawaban yang membahas alat, setelah classify_student_prompt dan sebelum berbicara, berisi 1–4 langkah berurutan. Hasil error berarti penunjuk tidak tampil.",
+    parametersJsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["steps"],
+      properties: {
+        steps: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["part", "say", "caption"],
+            properties: {
+              part: { type: "string", enum: [...labParts], description: "Id bagian alat yang ditunjuk." },
+              say: { type: "string", minLength: 3, maxLength: 80, description: "2–5 kata pertama PERSIS yang akan kamu ucapkan saat mulai membahas bagian ini. Bagian disorot ketika kata ini terdengar." },
+              caption: { type: "string", minLength: 1, maxLength: 60, description: "Label singkat yang tampil di dekat bagian itu." },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+export function assessmentTutorConfig(
+  systemInstruction: string,
+  options: { labParts?: readonly string[] } = {},
+): LiveConnectConfig {
   return {
     responseModalities: [Modality.AUDIO],
     inputAudioTranscription: {},
@@ -74,7 +111,7 @@ export function assessmentTutorConfig(systemInstruction: string): LiveConnectCon
           },
           required: ["content"],
         },
-      }],
+      }, ...(options.labParts?.length ? [pointAtLabPart(options.labParts)] : [])],
     }],
   };
 }

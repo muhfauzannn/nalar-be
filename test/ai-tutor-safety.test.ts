@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../src/database/client";
 import { courseMembership, quizAttempt } from "../src/database/schema";
 import { findOrCreateTutorConversation } from "../src/modules/ai-tutor/ai-tutor.repository";
-import { LAB_TUTOR_BRIEFS } from "../src/modules/ai-tutor/lab-tutor.config";
+import { LAB_TUTOR_BRIEFS, labPartIds, labPointerInstructions } from "../src/modules/ai-tutor/lab-tutor.config";
 import { LAB_CATALOG } from "../src/modules/labs/lab-catalog";
 import { tutorSessionLimiter } from "../src/modules/ai-tutor/ai-tutor.service";
 import {
@@ -147,5 +147,22 @@ describe("lab tutor conversations", () => {
       expect(brief).toBeDefined();
       expect(Object.keys(brief.missions).sort()).toEqual([...lab.challenges].sort());
     }
+  });
+
+  test("every lab names the parts its tutor may point at, and the rules say how and what not to give away", () => {
+    for (const lab of LAB_CATALOG) {
+      const brief = LAB_TUTOR_BRIEFS[lab.key];
+      expect(Object.keys(brief.parts).length).toBeGreaterThanOrEqual(3);
+      expect(labPartIds(lab.key)).toEqual(Object.keys(brief.parts));
+      const rules = labPointerInstructions(brief).join("\n");
+      for (const id of Object.keys(brief.parts)) expect(rules).toContain(`- ${id}: `);
+      expect(rules).toContain("point_at_lab_part");
+      expect(rules).toContain("tidak boleh membocorkan penyelesaian");
+      // Pointing shows where to look; a part's description never carries a mission's secret.
+      for (const mission of Object.values(brief.missions)) {
+        for (const text of Object.values(brief.parts)) expect(text).not.toContain(mission.solution);
+      }
+    }
+    expect(labPartIds("tidak-ada")).toEqual([]);
   });
 });
