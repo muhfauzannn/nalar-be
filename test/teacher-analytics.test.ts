@@ -15,6 +15,7 @@ import {
   writingSignal,
 } from "../src/database/schema";
 import { api, joinCourse, makeCourse, makeScenario, newUser, publishCourse, type Client } from "./helpers";
+import { journeyOf } from "../src/modules/authoring/class-journey";
 
 const STAGES = [
   "1_independent_effort",
@@ -130,6 +131,32 @@ async function setup() {
   const assignmentId = await newAssignment(teacher, course.id, scn.id);
   return { teacher, courseId: course.id as string, scenarioId: scn.id, assignmentId };
 }
+
+describe("a student's journey is read from their work", () => {
+  const long = Array.from({ length: 50 }, (_, index) => `kata${index}`).join(" ");
+  const other = Array.from({ length: 50 }, (_, index) => `baru${index}`).join(" ");
+  const none = { direct: 0, hint: 0, reflective: 0 };
+  const base = { draft: long, revision: other, draftWriting: undefined, revisionWriting: undefined, prompts: none };
+
+  test("a draft is strong when it is long and mostly typed", () => {
+    expect(journeyOf(base).draft).toBe("strong");
+    expect(journeyOf({ ...base, draft: "pendek saja" }).draft).toBe("thin");
+    expect(journeyOf({ ...base, draftWriting: { pastedChars: 80, finalChars: 100 } }).draft).toBe("thin");
+  });
+
+  test("what was asked follows the most frequent intent, and ties go to asking for the answer", () => {
+    expect(journeyOf(base).asked).toBe("none");
+    expect(journeyOf({ ...base, prompts: { direct: 1, hint: 1, reflective: 0 } }).asked).toBe("answers");
+    expect(journeyOf({ ...base, prompts: { direct: 0, hint: 2, reflective: 1 } }).asked).toBe("hints");
+    expect(journeyOf({ ...base, prompts: { direct: 0, hint: 1, reflective: 1 } }).asked).toBe("probing");
+  });
+
+  test("pasted text does not count as the student's own change", () => {
+    expect(journeyOf(base)).toMatchObject({ revision: "deep", ownChange: 100, pastedPercent: 0 });
+    expect(journeyOf({ ...base, revisionWriting: { pastedChars: 300, finalChars: 400 } })).toMatchObject({ revision: "pasted", ownChange: 25, pastedPercent: 75 });
+    expect(journeyOf({ ...base, revision: long })).toMatchObject({ revision: "light", ownChange: 0 });
+  });
+});
 
 describe("teacher analytics for one assignment", () => {
   test("only the course's teacher can read it", async () => {

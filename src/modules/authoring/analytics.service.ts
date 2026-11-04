@@ -13,11 +13,13 @@ import {
   listAssignmentSubmissions,
   listCourseOffloading,
   listFactors,
+  listJourneyInputs,
   listQuizAttemptsWithReflection,
   listStageProgress,
   listTutorTranscript,
   listWritingSignals,
 } from "./analytics.repository";
+import { JOURNEY_RULES, journeyOf } from "./class-journey";
 
 const LEVELS: OffloadingLevel[] = [
   "1_ai_as_tool",
@@ -35,6 +37,25 @@ const STAGES = [
 ] as const;
 
 const iso = (value: Date | null) => (value ? value.toISOString() : null);
+
+async function classJourneys(submissionIds: string[]) {
+  const { artifacts, writing, prompts } = await listJourneyInputs(submissionIds);
+  const text = (id: string, stage: string) => artifacts.find((row) => row.submissionId === id && row.stage === stage)?.content ?? "";
+  const signal = (id: string, stage: string) => writing.find((row) => row.submissionId === id && row.stage === stage);
+  const asked = (id: string, intent: string) => prompts.filter((row) => row.submissionId === id && row.intent === intent).length;
+  return new Map(
+    submissionIds.map((id) => [
+      id,
+      journeyOf({
+        draft: text(id, "1_independent_effort"),
+        revision: text(id, "4_revision_finalization"),
+        draftWriting: signal(id, "1_independent_effort"),
+        revisionWriting: signal(id, "4_revision_finalization"),
+        prompts: { direct: asked(id, "direct_answer"), hint: asked(id, "explanation_hint"), reflective: asked(id, "reflective_evaluative") },
+      }),
+    ]),
+  );
+}
 
 // The class view of one assignment: who is where in the five stages, how the
 // class spreads over the four Index levels, and which factors keep coming up.
@@ -56,9 +77,11 @@ export async function getAssignmentAnalytics(userId: string, assignmentId: strin
   }
 
   const membershipIds = students.map((student) => student.membershipId);
-  const [completed, history] = await Promise.all([
+  const finished = [...latest.values()].filter((row) => row.status === "submitted" || row.status === "returned");
+  const [completed, history, journeys] = await Promise.all([
     countCompletedStages([...latest.values()].map((row) => row.id)),
     listCourseOffloading(meta.courseId, membershipIds),
+    classJourneys(finished.map((row) => row.id)),
   ]);
   const bySubmission = new Map(history.map((row) => [row.submissionId, row]));
   const factors = await listFactors(
@@ -125,6 +148,7 @@ export async function getAssignmentAnalytics(userId: string, assignmentId: strin
       stagesCompleted: sub ? completed.get(sub.id) ?? 0 : 0,
       submittedAt: iso(sub?.submittedAt ?? null),
       offloading,
+      journey: sub ? journeys.get(sub.id) ?? null : null,
     };
   });
 
@@ -149,6 +173,10 @@ export async function getAssignmentAnalytics(userId: string, assignmentId: strin
         example: tally.example,
       })),
     students: rows,
+    journeyRules: {
+      strongDraftWords: JOURNEY_RULES.strongDraftWords,
+      deepRevisionPercent: Math.round(JOURNEY_RULES.deepRevision * 100),
+    },
   };
 }
 

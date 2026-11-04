@@ -182,6 +182,34 @@ export async function listArtifacts(submissionId: string) {
     .orderBy(asc(stageArtifact.stage), asc(stageArtifact.version));
 }
 
+// What the class's journey is read from, for many submissions at once.
+export async function listJourneyInputs(submissionIds: string[]) {
+  if (submissionIds.length === 0) return { artifacts: [], writing: [], prompts: [] };
+  const [artifacts, writing, prompts] = await Promise.all([
+    db
+      .select({ submissionId: stageArtifact.submissionId, stage: stageArtifact.stage, content: stageArtifact.content })
+      .from(stageArtifact)
+      .where(
+        and(
+          inArray(stageArtifact.submissionId, submissionIds),
+          inArray(stageArtifact.stage, ["1_independent_effort", "4_revision_finalization"]),
+          eq(stageArtifact.isFinal, true),
+        ),
+      ),
+    db
+      .select({ submissionId: writingSignal.submissionId, stage: writingSignal.stage, pastedChars: writingSignal.pastedChars, finalChars: writingSignal.finalChars })
+      .from(writingSignal)
+      .where(inArray(writingSignal.submissionId, submissionIds)),
+    db
+      .select({ submissionId: tutorConversation.submissionId, intent: promptClassification.intent })
+      .from(tutorConversation)
+      .innerJoin(tutorMessage, eq(tutorMessage.conversationId, tutorConversation.id))
+      .innerJoin(promptClassification, eq(promptClassification.messageId, tutorMessage.id))
+      .where(inArray(tutorConversation.submissionId, submissionIds)),
+  ]);
+  return { artifacts, writing, prompts };
+}
+
 export async function listTutorTranscript(submissionId: string) {
   return db
     .select({
