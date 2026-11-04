@@ -181,6 +181,22 @@ async function finishedJourney(assignmentId: string, membershipId: string, index
   return id;
 }
 
+describe("a marked evaluation", () => {
+  const quote = "> NALAR: Jawaban ini kurang tepat karena belum menyebut gaya gesek dan seharusnya memakai komponen berat pada bidang miring yang sudutnya berubah setiap kali percobaan diulang di meja.";
+  const earns = (text: string) =>
+    evaluateProcessPoints(fullInputs({ texts: { ...fullInputs().texts, "3_ai_evaluation": text } })).map((award) => award.kind).includes("critical_evaluation");
+
+  test("clicking a mark on a long tutor reply earns nothing: the quote and the mark are the app's words", () => {
+    expect(earns(`${quote}\nPenilaianku (kurang): Saya setuju saja dengan ini.`)).toBe(false);
+  });
+
+  test("the student's own reasons earn it, as free text does", () => {
+    const reason = "Petunjuknya belum menyebut jenis permukaan, padahal percobaan kami memakai kayu dan kaca yang hasilnya sangat berbeda, jadi saya harus menambah perbandingan itu ke jawaban saya.";
+    expect(earns(`${quote}\nPenilaianku (kurang): ${reason}`)).toBe(true);
+    expect(earns(reason)).toBe(true);
+  });
+});
+
 describe("island map and Poin Nalar ledger", () => {
   test("stage completion reports the points it earned, once", async () => {
     const { teacher, courseId, assignmentId } = await setup();
@@ -212,6 +228,10 @@ describe("island map and Poin Nalar ledger", () => {
 
     const rows = await db.select().from(processPointEvent).where(eq(processPointEvent.submissionId, submissionId));
     expect(rows.map((row) => row.kind).sort()).toEqual(["hint_request", "independent_draft"]);
+
+    // The later posts show the student what the tutor conversation said.
+    const task = await api(learner.client, "GET", `/api/student/assignments/${assignmentId}`);
+    expect(task.body.submission.tutorMessages).toEqual([{ id: message!.id, author: "student", content: "Bagaimana cara membandingkan?" }]);
   });
 
   test("the island backfills earlier work, opens the chest and counts the class bridge without the teacher", async () => {

@@ -23,6 +23,8 @@ import {
   subject,
   submission,
   submissionAssessment,
+  tutorConversation,
+  tutorMessage,
   user,
   writingSignal,
 } from "../../database/schema";
@@ -495,7 +497,7 @@ export async function findStudentAssignment(
 
   if (!submissionRow) return { ...row, criteria, submission: null };
 
-  const [stages, artifacts, [assessment]] = await Promise.all([
+  const [stages, artifacts, [assessment], tutorMessages] = await Promise.all([
     db
       .select({ stage: stageProgress.stage, status: stageProgress.status })
       .from(stageProgress)
@@ -531,12 +533,19 @@ export async function findStudentAssignment(
       .from(submissionAssessment)
       .where(eq(submissionAssessment.submissionId, submissionRow.id))
       .limit(1),
+    // Pos 3 asks the student to judge what the tutor said, so it has to be in front of them.
+    db
+      .select({ id: tutorMessage.id, author: tutorMessage.author, content: tutorMessage.content })
+      .from(tutorMessage)
+      .innerJoin(tutorConversation, eq(tutorConversation.id, tutorMessage.conversationId))
+      .where(eq(tutorConversation.submissionId, submissionRow.id))
+      .orderBy(asc(tutorMessage.sequence)),
   ]);
 
   return {
     ...row,
     criteria,
-    submission: { ...submissionRow, stages, artifacts, assessment: assessment ?? null },
+    submission: { ...submissionRow, stages, artifacts, tutorMessages, assessment: assessment ?? null },
   };
 }
 

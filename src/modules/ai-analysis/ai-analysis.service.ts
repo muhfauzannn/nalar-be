@@ -18,7 +18,8 @@ import {
   type SubmissionAnalysisContext,
 } from "./ai-analysis.repository";
 
-const SCORING_VERSION = "nalar-offload-v1";
+// v2 (4 November 2026): Tahap 3 can be marked tutor replies, and Tahap 4 opens on the draft.
+const SCORING_VERSION = "nalar-offload-v2";
 // `generateContent` model for offline analysis (offloading index + quiz reflection).
 // Must be a servable model id — `gemini-3.1-flash` (only `-lite` shipped) 404s and
 // silently yields null reports. `gemini-2.5-flash` is GA and supports structured output.

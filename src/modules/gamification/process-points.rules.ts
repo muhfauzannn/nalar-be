@@ -58,6 +58,12 @@ const CRITIQUE =
 const SPECIFIC =
   /\b(karena|misalnya|contohnya|contoh|awalnya|sekarang|ternyata|sebelumnya|setelah|tahap|draf|revisi|bagian)\b/i;
 
+// A marked Pos 3 quotes the tutor and names a mark ("kurang" is one): the app wrote those, not the
+// student, so a click earns nothing. Written by the app's composeEvaluation (evaluation-marks.ts).
+export function evaluationProse(text: string) {
+  return text.replace(/^> .*$/gm, "").replace(/^Penilaianku \([^)]*\):/gm, "");
+}
+
 export function words(text: string) {
   return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
@@ -105,7 +111,7 @@ export function evaluateProcessPoints(input: PointInputs): PointAward[] {
     if (input.intents.includes("reflective_evaluative")) award("reflective_question", "2_guided_questioning");
   }
 
-  const evaluation = input.texts["3_ai_evaluation"] ?? "";
+  const evaluation = evaluationProse(input.texts["3_ai_evaluation"] ?? "");
   if (
     done.has("3_ai_evaluation") &&
     words(evaluation).length >= MIN_EVALUATION_WORDS &&
