@@ -164,6 +164,46 @@ export async function listStudentCourses(userId: string) {
   return { courses };
 }
 
+// What a student still has to do in one course: assignments not handed in and
+// quizzes not taken, by the status the quiz page itself shows.
+export function upcomingWork(
+  course: { id: string; name: string },
+  assignments: Array<{ id: string; title: string; dueAt: Date | null; submissionStatus: string | null }>,
+  quizzes: Array<{ id: string; title: string; dueAt: Date | null; attemptStatus: string }>,
+) {
+  return [
+    ...assignments
+      .filter((entry) => !entry.submissionStatus || entry.submissionStatus === "in_progress")
+      .map((entry) => ({
+        id: entry.id,
+        courseId: course.id,
+        type: "assignment" as const,
+        title: entry.title,
+        courseName: course.name,
+        dueAt: entry.dueAt,
+        status: entry.submissionStatus ?? "not_started",
+      })),
+    ...quizzes
+      .filter((entry) => entry.attemptStatus === "not_started" || entry.attemptStatus === "in_progress")
+      .map((entry) => ({
+        id: entry.id,
+        courseId: course.id,
+        type: "quiz" as const,
+        title: entry.title,
+        courseName: course.name,
+        dueAt: entry.dueAt,
+        status: entry.attemptStatus,
+      })),
+  ];
+}
+
+/** Soonest first; what has no due date goes last. */
+export function byDueDate(left: { dueAt: Date | null }, right: { dueAt: Date | null }) {
+  if (!left.dueAt) return right.dueAt ? 1 : 0;
+  if (!right.dueAt) return -1;
+  return left.dueAt.getTime() - right.dueAt.getTime();
+}
+
 export async function getStudentDashboard(session: AuthSession) {
   const profile = await findStudentProfile(session.user.id);
   const rows = await listStudentCourseRows(session.user.id);
@@ -180,41 +220,13 @@ export async function getStudentDashboard(session: AuthSession) {
     .flatMap((item, index) => {
       const courseRow = rows[index];
       if (!courseRow || courseRow.status !== "published") return [];
-      return [
-      ...item.assignmentRows
-        .filter((entry) => !entry.submissionStatus || entry.submissionStatus === "in_progress")
-        .map((entry) => ({
-          id: entry.id,
-          type: "assignment" as const,
-          title: entry.title,
-          courseName: courseRow.name,
-          dueAt: entry.dueAt,
-          status: entry.submissionStatus ?? "not_started",
-        })),
-      ...item.quizRows
-        .map((entry) => ({
-          entry,
-          effectiveStatus: getQuizActivityStatus(entry),
-        }))
-        .filter(
-          ({ effectiveStatus }) =>
-            effectiveStatus === "not_started" || effectiveStatus === "in_progress",
-        )
-        .map(({ entry, effectiveStatus }) => ({
-          id: entry.id,
-          type: "quiz" as const,
-          title: entry.title,
-          courseName: courseRow.name,
-          dueAt: entry.dueAt,
-          status: effectiveStatus,
-        })),
-    ];
+      return upcomingWork(
+        courseRow,
+        item.assignmentRows,
+        item.quizRows.map((entry) => ({ ...entry, attemptStatus: getQuizActivityStatus(entry) })),
+      );
     })
-    .sort((left, right) => {
-      if (!left.dueAt) return 1;
-      if (!right.dueAt) return -1;
-      return left.dueAt.getTime() - right.dueAt.getTime();
-    })
+    .sort(byDueDate)
     .slice(0, 6);
 
   const completedItems = courses.reduce(

@@ -1,10 +1,11 @@
 import { getCourseIsland, getStudentProgress } from "../gamification/gamification.service";
 import { listStudentCourseRows } from "./student.repository";
-import { getStudentCourse } from "./student.service";
+import { byDueDate, getStudentCourse, upcomingWork } from "./student.service";
 
 type Course = Awaited<ReturnType<typeof getStudentCourse>>;
 type Island = Awaited<ReturnType<typeof getCourseIsland>>;
 
+const UPCOMING_LIMIT = 8;
 const FINISHED = new Set(["closed", "completed", "expired", "graded", "returned", "submitted"]);
 
 /**
@@ -67,13 +68,19 @@ export async function getStudentWorld(userId: string) {
   const islands = await Promise.all(
     courses.map(async (row) => {
       const [island, course] = await Promise.all([getCourseIsland(userId, row.id), getStudentCourse(userId, row.id)]);
-      return { island, sketch: islandSketch(course, island) };
+      return { island, course, sketch: islandSketch(course, island) };
     }),
   );
   // After the islands: both award points still owed, one at a time.
   const progress = await getStudentProgress(userId);
   return {
     ...progress,
+    // The deadlines on the HUD: what is still open and has a due date, soonest first.
+    upcoming: islands
+      .flatMap(({ course }) => upcomingWork(course.course, course.assignments, course.quizzes))
+      .filter((item) => item.dueAt)
+      .sort(byDueDate)
+      .slice(0, UPCOMING_LIMIT),
     islands: islands.map(({ island, sketch }) => {
       const current =
         island.buildings.find((item) => item.submissionStatus === "in_progress") ??
