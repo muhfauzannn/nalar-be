@@ -773,6 +773,7 @@ export async function findStudentQuiz(quizId: string, userId: string) {
       availableAt: quiz.availableAt,
       dueAt: quiz.dueAt,
       closesAt: quiz.closesAt,
+      aiAssistantEnabled: quiz.aiAssistantEnabled,
       timeLimitMinutes: quiz.timeLimitMinutes,
       courseId: course.id,
       courseName: course.name,

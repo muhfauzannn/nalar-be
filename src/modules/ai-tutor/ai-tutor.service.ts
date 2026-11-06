@@ -44,6 +44,7 @@ export const LIVE_SESSION_MAX_SECONDS = 600;
 export const LIVE_NEW_SESSION_WINDOW_MS = 120_000;
 
 export type AiTutorErrorCode =
+  | "QUIZ_AI_DISABLED"
   | "AI_TUTOR_UNAVAILABLE"
   | "AI_TUTOR_TARGET_NOT_FOUND"
   | "AI_TUTOR_STAGE_LOCKED"
@@ -122,6 +123,10 @@ export async function createAiTutorSession(input: {
   }
   tutorSessionLimiter.record(input.userId);
 
+  const authorizedQuiz = input.target.targetType === "quiz"
+    ? await authorizeTarget(input.userId, input.target, true)
+    : null;
+
   if (!env.geminiApiKey) {
     throw new AiTutorServiceError(
       503,
@@ -130,7 +135,7 @@ export async function createAiTutorSession(input: {
     );
   }
 
-  const target = await authorizeTarget(input.userId, input.target, true);
+  const target = authorizedQuiz ?? await authorizeTarget(input.userId, input.target, true);
   const conversation = await findOrCreateTutorConversation(target.conversationTarget);
   if (!conversation) {
     throw new AiTutorServiceError(
@@ -433,6 +438,7 @@ async function authorizeTarget(
       "AI_TUTOR_TARGET_NOT_FOUND",
     );
   }
+  assertQuizAiEnabled(context);
   if (!context.question && requireActive) {
     throw new AiTutorServiceError(
       400,
@@ -473,7 +479,14 @@ function assertAssignmentActive(context: {
   }
 }
 
+function assertQuizAiEnabled(context: { aiAssistantEnabled: boolean }) {
+  if (!context.aiAssistantEnabled) {
+    throw new AiTutorServiceError(403, "AI Assistant dinonaktifkan oleh guru untuk kuis ini.", "QUIZ_AI_DISABLED");
+  }
+}
+
 function assertQuizActive(context: {
+  aiAssistantEnabled: boolean;
   attemptStatus: string;
   quizStatus: string;
   enrollmentStatus: string;
@@ -481,6 +494,7 @@ function assertQuizActive(context: {
   startedAt: Date;
   timeLimitMinutes: number | null;
 }) {
+  assertQuizAiEnabled(context);
   if (isQuizEnded(context)) throw activityEndedError();
 }
 
@@ -720,6 +734,7 @@ function labContext(context: NonNullable<Awaited<ReturnType<typeof findLabTutorT
     ...(brief
       ? [
           `Alat di layar: ${brief.machine}`,
+          `${brief.story} Siswa membaca cerita ini di lab; boleh dipakai sebagai konteks, tetapi yang kamu ajarkan tetap konsepnya.`,
           `Konsep: ${brief.concept}`,
           "Misi lab (penyelesaian hanya untuk kamu, JANGAN pernah diucapkan, ditulis, atau diisyaratkan sampai jawabannya jelas):",
           ...Object.entries(brief.missions).map(

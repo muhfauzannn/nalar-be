@@ -580,6 +580,7 @@ export const quiz = pgTable(
     availableAt: timestamp("available_at", { withTimezone: true }),
     dueAt: timestamp("due_at", { withTimezone: true }),
     closesAt: timestamp("closes_at", { withTimezone: true }),
+    aiAssistantEnabled: boolean("ai_assistant_enabled").default(true).notNull(),
     timeLimitMinutes: smallint("time_limit_minutes"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     ...timestamps,

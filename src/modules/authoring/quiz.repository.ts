@@ -32,6 +32,7 @@ export type QuizSnapshot = {
   availableAt: Date | null;
   dueAt: Date | null;
   closesAt: Date | null;
+  aiAssistantEnabled: boolean;
   timeLimitMinutes: number | null;
   publishedAt: Date | null;
   attemptCount: number;
@@ -45,6 +46,7 @@ export type QuizPatch = Partial<{
   availableAt: Date | null;
   dueAt: Date | null;
   closesAt: Date | null;
+  aiAssistantEnabled: boolean;
   timeLimitMinutes: number | null;
   publishedAt: Date;
 }>;
@@ -122,6 +124,7 @@ export async function getQuizEditor(quizId: string) {
       availableAt: quiz.availableAt,
       dueAt: quiz.dueAt,
       closesAt: quiz.closesAt,
+      aiAssistantEnabled: quiz.aiAssistantEnabled,
       timeLimitMinutes: quiz.timeLimitMinutes,
     })
     .from(quiz)
@@ -237,6 +240,7 @@ async function loadLockedQuiz(tx: Transaction, quizId: string): Promise<QuizSnap
     availableAt: row.availableAt,
     dueAt: row.dueAt,
     closesAt: row.closesAt,
+    aiAssistantEnabled: row.aiAssistantEnabled,
     timeLimitMinutes: row.timeLimitMinutes,
     publishedAt: row.publishedAt,
     attemptCount: attempts?.total ?? 0,
@@ -313,6 +317,7 @@ export async function createQuiz(input: {
   availableAt: Date | null;
   dueAt: Date | null;
   closesAt: Date | null;
+  aiAssistantEnabled: boolean;
   timeLimitMinutes: number | null;
 }) {
   const [countRow] = await db
@@ -337,6 +342,7 @@ export async function createQuiz(input: {
       availableAt: input.availableAt,
       dueAt: input.dueAt,
       closesAt: input.closesAt,
+      aiAssistantEnabled: input.aiAssistantEnabled,
       timeLimitMinutes: input.timeLimitMinutes,
     })
     .returning({ id: quiz.id });
@@ -359,6 +365,7 @@ export async function duplicateQuiz(quizId: string, teacherMembershipId: string)
         availableAt: source.availableAt,
         dueAt: source.dueAt,
         closesAt: source.closesAt,
+        aiAssistantEnabled: source.aiAssistantEnabled,
         timeLimitMinutes: source.timeLimitMinutes,
       })
       .returning({ id: quiz.id });

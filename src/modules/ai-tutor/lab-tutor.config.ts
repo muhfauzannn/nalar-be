@@ -7,6 +7,8 @@ import type { LabKey } from "../labs/lab-catalog";
 
 export type LabTutorBrief = {
   machine: string;
+  /** The story the lab tells around its missions (nalar-fe/app/features/labs/<lab>/story.ts). */
+  story: string;
   concept: string;
   /**
    * The parts of the machine the tutor may point at (tool `point_at_lab_part`): id, then what
@@ -35,6 +37,8 @@ export function labPointerInstructions(brief: LabTutorBrief) {
 
 export const LAB_TUTOR_BRIEFS: Record<LabKey, LabTutorBrief> = {
   "gerak-parabola": {
+    story:
+      "Cerita lab \"Jembatan Putus\": longsor memutus jalan ke Benteng Tua tempat warga mengungsi, jadi siswa mengirim bantuan dengan meriam tua di dalam bola besi berongga. Bendera adalah titik jemput warga; misi 3 membandingkan bola obat 1 kg dan bola beras 5 kg.",
     machine:
       "Meriam di atas tebing setinggi 6 m menembakkan bola ke lapangan sepanjang 40 m. Siswa mengatur sudut laras (10°–80°) dan takaran mesiu (kecepatan awal 8–22 m/s), memilih bola 1 kg atau 5 kg, lalu menembak. Sebuah kereta kecil berjalan tepat di bawah bola. Tanpa hambatan udara, g = 9,8 m/s².",
     concept: "Gerak parabola: kecepatan mendatar tetap, kecepatan tegak berkurang g tiap detik, massa tidak memengaruhi lintasan.",
@@ -65,6 +69,8 @@ export const LAB_TUTOR_BRIEFS: Record<LabKey, LabTutorBrief> = {
     },
   },
   "mesin-gelombang": {
+    story:
+      "Cerita lab \"Peramal Pasang\": siswa menggantikan petugas pelabuhan yang memutar mesin peramal pasang; y adalah tinggi air dan satu putaran engkol satu siklus pasang. Misi 1 ambang kapal di y = 0,5, misi 2 pelabuhan dengan pasang lebih sering, misi 3 meniru rekaman stasiun pasang.",
     machine:
       "Engkol memutar roda lewat sabuk dengan roda gigi 1× atau 2×. Sebuah pasak di roda berjarak A (0,5–2) dari poros; pena di papan grafik selalu setinggi pasak, sehingga memutar engkol menggambar y = A·sin(b·θ) terhadap sudut engkol θ (0°–360°). Siswa bisa menandai titik pada grafik.",
     concept: "Fungsi sinus sebagai tinggi titik pada lingkaran; amplitudo A dan periode 360°/b.",
@@ -95,6 +101,8 @@ export const LAB_TUTOR_BRIEFS: Record<LabKey, LabTutorBrief> = {
     },
   },
   "reaktor-tumbukan": {
+    story:
+      "Cerita lab \"Hari Pertama Jadi Operator\": siswa operator baru di pabrik di bawah Bu Sari, kepala shift. Misi 1 pesanan 2× lebih cepat, misi 2 pertanyaan bagian keuangan soal katalis mahal, misi 3 pesanan besar dengan batas kaca reaktor.",
     machine:
       "Reaktor kaca berisi partikel A (merah) dan B (biru) di atas pemanas. Siswa memutar kenop pemanas (290–340 K), menekan pompa suntik untuk konsentrasi (0,5–2,0 M), dan mencelupkan keranjang katalis. Kilatan kuning adalah tumbukan yang berhasil, cincin abu-abu tumbukan yang memantul. Pengukur menunjukkan laju dibanding campuran awal (300 K, 1,0 M, tanpa katalis). Ea = 53,6 kJ/mol, dengan katalis 48,4 kJ/mol; laju ∝ k·[A].",
     concept: "Teori tumbukan dan laju reaksi: suhu menambah bagian tumbukan yang energinya ≥ Ea, konsentrasi menambah jumlah tumbukan, katalis menurunkan Ea dan tidak habis.",
@@ -124,6 +132,8 @@ export const LAB_TUTOR_BRIEFS: Record<LabKey, LabTutorBrief> = {
     },
   },
   "mikroskop-osmosis": {
+    story:
+      "Cerita lab \"Shift Malam di Klinik\": siswa magang di klinik dan diuji Kak Rani, perawat jaga: kenapa infus tidak boleh air murni (misi 1), larutan apa yang aman (misi 2), lalu pertanyaan ibu kantin soal bawang acar yang lemas setelah digarami (misi 3).",
     machine:
       "Mikroskop dengan pipet berskala 0–3 % NaCl. Siswa menggeser cincin pipet, meneteskan larutan ke kaca preparat, lalu mengamati sel di lensa: panah biru adalah arah air, titik kuning adalah garam. Sel darah merah isotonis dengan 0,9 %, pecah bila volumenya ≥ 160 %, mengkerut di bawah 90 %. Sel bawang merah isotonis sekitar 1,0 %; dindingnya menahan sel agar tidak pecah, dan membran lepas dari dinding (plasmolisis) bila volume protoplas di bawah 80 %.",
     concept: "Osmosis: air bergerak melalui membran semipermeabel menuju larutan yang lebih pekat; hipotonis, isotonis, hipertonis; turgor dan plasmolisis.",

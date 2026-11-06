@@ -151,6 +151,11 @@ export function parseOrder(body: Record<string, unknown>) {
 
 // ---- quizzes ------------------------------------------------------------
 
+function parseAiAssistantEnabled(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new AuthoringRequestError("Pengaturan AI Assistant harus berupa boolean.");
+  return value;
+}
+
 function parseTimeLimit(value: unknown) {
   return value === null || value === "" || value === undefined
     ? null
@@ -165,6 +170,7 @@ export function parseNewQuiz(body: Record<string, unknown>): QuizInput {
     availableAt: optionalDate(body.availableAt, "Waktu mulai"),
     dueAt: optionalDate(body.dueAt, "Batas pengumpulan"),
     closesAt: optionalDate(body.closesAt, "Waktu penutupan"),
+    aiAssistantEnabled: has(body, "aiAssistantEnabled") ? parseAiAssistantEnabled(body.aiAssistantEnabled) : true,
     timeLimitMinutes: parseTimeLimit(body.timeLimitMinutes),
   };
 }
@@ -177,6 +183,7 @@ export function parseQuizPatch(body: Record<string, unknown>) {
   if (has(body, "availableAt")) patch.availableAt = optionalDate(body.availableAt, "Waktu mulai");
   if (has(body, "dueAt")) patch.dueAt = optionalDate(body.dueAt, "Batas pengumpulan");
   if (has(body, "closesAt")) patch.closesAt = optionalDate(body.closesAt, "Waktu penutupan");
+  if (has(body, "aiAssistantEnabled")) patch.aiAssistantEnabled = parseAiAssistantEnabled(body.aiAssistantEnabled);
   if (has(body, "timeLimitMinutes")) patch.timeLimitMinutes = parseTimeLimit(body.timeLimitMinutes);
   if (has(body, "status")) patch.status = oneOf(body.status, WORK, "Status kuis");
   return nonEmpty(patch);

@@ -29,6 +29,7 @@ export type QuizInput = {
   availableAt: Date | null;
   dueAt: Date | null;
   closesAt: Date | null;
+  aiAssistantEnabled: boolean;
   timeLimitMinutes: number | null;
 };
 

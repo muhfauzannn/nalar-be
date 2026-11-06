@@ -166,3 +166,30 @@ describe("lab tutor conversations", () => {
     expect(labPartIds("tidak-ada")).toEqual([]);
   });
 });
+
+
+test("disabling quiz AI blocks existing conversations and subsequent turns", async () => {
+  const { teacher, course, alice } = await twoStudentsInAuthoredCourse();
+  const created = await api(teacher, "POST", `/api/manage/courses/${course.id}/quizzes`, { title: "Kuis tanpa AI" });
+  const quizId = created.body.id;
+  const question = await api(teacher, "POST", `/api/manage/quizzes/${quizId}/questions`, multipleChoice());
+  await api(teacher, "PATCH", `/api/manage/quizzes/${quizId}`, { status: "published" });
+  await api(alice, "POST", `/api/student/quizzes/${quizId}/attempts`, {});
+  const view = await api(alice, "GET", `/api/student/quizzes/${quizId}`);
+  expect(view.body.quiz.aiAssistantEnabled).toBe(true);
+  const conversation = await findOrCreateTutorConversation({ quizAttemptId: view.body.attempt.id });
+  expect((await messagesOf(alice, conversation!.id)).status).toBe(200);
+  await api(teacher, "PATCH", `/api/manage/quizzes/${quizId}`, { aiAssistantEnabled: false });
+  expect((await api(alice, "GET", `/api/student/quizzes/${quizId}`)).body.quiz.aiAssistantEnabled).toBe(false);
+  expect((await messagesOf(alice, conversation!.id)).body.code).toBe("QUIZ_AI_DISABLED");
+  const session = await api(alice, "POST", "/api/student/ai-tutor/sessions", { targetType: "quiz", targetId: view.body.attempt.id, questionId: question.body.id, mode: "hint" });
+  expect(session.status).toBe(403);
+  expect(session.body.code).toBe("QUIZ_AI_DISABLED");
+  const refused = await api(alice, "POST", `/api/student/ai-tutor/conversations/${conversation!.id}/classifications`, {
+    questionId: question.body.id, clientEventId: crypto.randomUUID(), content: "Bantu jelaskan konsep ini", mode: "hint",
+  });
+  expect(refused.status).toBe(403);
+  expect(refused.body.code).toBe("QUIZ_AI_DISABLED");
+  await api(teacher, "PATCH", `/api/manage/quizzes/${quizId}`, { aiAssistantEnabled: true });
+  expect((await messagesOf(alice, conversation!.id)).status).toBe(200);
+});

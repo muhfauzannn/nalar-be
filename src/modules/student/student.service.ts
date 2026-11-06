@@ -608,6 +608,7 @@ export async function getStudentQuiz(userId: string, quizId: string) {
       availableAt: row.availableAt,
       dueAt: row.dueAt,
       closesAt: row.closesAt,
+      aiAssistantEnabled: row.aiAssistantEnabled,
       timeLimitMinutes: row.timeLimitMinutes,
       courseId: row.courseId,
       courseName: row.courseName,

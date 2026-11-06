@@ -391,3 +391,22 @@ describe("quizzes of other courses", () => {
     expect(row?.status).toBe("draft");
   });
 });
+
+
+describe("quiz AI Assistant settings", () => {
+  test("defaults to enabled, persists changes and copies the setting", async () => {
+    const { teacher, quizId, course } = await setup();
+    const path = `/api/manage/quizzes/${quizId}`;
+    expect((await api(teacher, "GET", path)).body.quiz.aiAssistantEnabled).toBe(true);
+    expect((await api(teacher, "PATCH", path, { aiAssistantEnabled: false })).status).toBe(200);
+    expect((await api(teacher, "GET", path)).body.quiz.aiAssistantEnabled).toBe(false);
+    const copied = await api(teacher, "POST", `${path}/duplicate`, {});
+    expect(copied.status).toBe(201);
+    expect((await api(teacher, "GET", `/api/manage/quizzes/${copied.body.id}`)).body.quiz.aiAssistantEnabled).toBe(false);
+    expect((await api(teacher, "PATCH", path, { aiAssistantEnabled: "false" })).status).toBe(400);
+    expect((await api(teacher, "PATCH", path, { aiAssistantEnabled: true })).status).toBe(200);
+    const created = await api(teacher, "POST", `/api/manage/courses/${course.id}/quizzes`, { title: "Tanpa AI", aiAssistantEnabled: false });
+    expect(created.status).toBe(201);
+    expect((await api(teacher, "GET", `/api/manage/quizzes/${created.body.id}`)).body.quiz.aiAssistantEnabled).toBe(false);
+  });
+});
