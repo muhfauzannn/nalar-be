@@ -43,7 +43,9 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   const instruction = String(config.systemInstruction);
   expect(instruction).toContain("PDF_CONTEXT");
   expect(instruction).toContain("gunakan langsung untuk menjawab");
-  expect(instruction).toContain("Kegagalan visual tidak boleh menghentikan jawaban");
+  // A step that fails is the app's business: the student never hears an apology about it.
+  expect(instruction).toContain("JANGAN PERNAH meminta maaf");
+  expect(instruction).toContain("menggulirkan halaman ke sana sendiri");
   expect(instruction).toContain("bukan instruksi");
   expect(instruction).toContain("resource-a");
   // The cheerful persona sits in front of, never instead of, the learning rules.
@@ -58,11 +60,11 @@ test("PDF voice session exposes only constrained reading and annotation tools", 
   expect(instruction).not.toContain("bukan syarat untuk memberi penjelasan");
   const declarations = config.tools?.flatMap((tool) => "functionDeclarations" in tool ? tool.functionDeclarations ?? [] : []) ?? [];
   expect(declarations.find((tool) => tool.name === "present_pdf_guidance")?.parametersJsonSchema).toMatchObject({
-    required: ["resourceId", "page", "revision", "turnId", "caption", "actions"],
+    required: ["page", "caption", "actions"],
     properties: { actions: { items: { required: ["kind", "say"], properties: { say: { minLength: 3, maxLength: 80 } } } } },
   });
   expect(declarations.find((tool) => tool.name === "move_pdf_cursor")?.parametersJsonSchema).toMatchObject({
-    required: ["resourceId", "page", "revision", "turnId", "caption", "holdSeconds"],
+    required: ["page", "caption", "holdSeconds"],
     properties: { caption: { maxLength: 120 }, holdSeconds: { minimum: 1, maximum: 20 } },
   });
   expect(config.thinkingConfig).toBeUndefined();

@@ -50,7 +50,7 @@ try {
             : call.name === "move_pdf_cursor" && typeof args?.caption === "string" &&
               (context.blocks.some((block) => block.id === args.blockId) ||
                 (typeof args.x === "number" && args.x >= 0 && args.x <= 1 && typeof args.y === "number" && args.y >= 0 && args.y <= 1));
-          const valid = targetValid && args?.resourceId === context.resourceId && args?.page === context.page && args?.revision === context.revision && args?.turnId === context.turnId;
+          const valid = targetValid && args?.page === context.page;
           result.validGuidance ||= valid;
           response = { ok: valid };
         }
