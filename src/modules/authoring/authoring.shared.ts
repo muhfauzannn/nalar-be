@@ -20,11 +20,12 @@ export type AuthoringErrorCode =
   | "SUBJECT_NOT_FOUND"
   | "MODULE_NOT_IN_COURSE"
   | "LAB_NOT_FOUND"
-  | "LAB_IN_USE";
+  | "LAB_IN_USE"
+  | "LAB_MATCH_UNAVAILABLE";
 
 export class AuthoringServiceError extends Error {
   constructor(
-    public readonly status: 400 | 404 | 409,
+    public readonly status: 400 | 404 | 409 | 503,
     message: string,
     public readonly code: AuthoringErrorCode,
   ) {

@@ -25,6 +25,7 @@ import {
 } from "./authoring.parsers";
 import { getAssignmentAnalytics, getQuizAnalytics, getSubmissionProcess } from "./analytics.service";
 import { attachLab, detachLab, labCatalog } from "../labs/labs.service";
+import { MAX_IMAGE_BYTES, matchLab, parseLabMatch } from "../labs/lab-match";
 import {
   copyMyAssignment,
   createMyAssignment,
@@ -242,6 +243,16 @@ authoringRoutes.delete("/resources/:resourceId", async (context) =>
 // ---- labs -----------------------------------------------------------------
 
 authoringRoutes.get("/labs", (context) => context.json({ labs: labCatalog() }));
+
+// "Rakit lab": which catalog labs fit a described tool or a photo of one (lab-match.ts).
+const matchLimit = bodyLimit({
+  maxSize: Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 64 * 1024,
+  onError: (context) => context.json({ error: "Gambar terlalu besar." }, 413),
+});
+
+authoringRoutes.post("/labs/match", matchLimit, async (context) =>
+  context.json(await matchLab(parseLabMatch(await readObject(context.req.raw)))),
+);
 
 authoringRoutes.post("/lessons/:lessonId/labs", async (context) => {
   const body = await readObject(context.req.raw);
