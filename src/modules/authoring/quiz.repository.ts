@@ -2,6 +2,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db } from "../../database/client";
 import {
+  course,
   courseMembership,
   learningModule,
   quiz,
@@ -117,6 +118,7 @@ export async function getQuizEditor(quizId: string) {
     .select({
       id: quiz.id,
       courseId: quiz.courseId,
+      courseName: course.name,
       moduleId: quiz.moduleId,
       title: quiz.title,
       instructions: quiz.instructions,
@@ -128,6 +130,7 @@ export async function getQuizEditor(quizId: string) {
       timeLimitMinutes: quiz.timeLimitMinutes,
     })
     .from(quiz)
+    .innerJoin(course, eq(course.id, quiz.courseId))
     .where(eq(quiz.id, quizId))
     .limit(1);
   if (!quizRow) throw notFound();

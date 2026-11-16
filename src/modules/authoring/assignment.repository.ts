@@ -3,6 +3,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "../../database/client";
 import {
   assignment,
+  course,
   courseMembership,
   rubric,
   rubricCriterion,
@@ -73,6 +74,7 @@ export async function getAssignmentEditor(assignmentId: string) {
     .select({
       id: assignment.id,
       courseId: assignment.courseId,
+      courseName: course.name,
       moduleId: assignment.moduleId,
       rubricId: assignment.rubricId,
       title: assignment.title,
@@ -88,6 +90,7 @@ export async function getAssignmentEditor(assignmentId: string) {
     .from(assignment)
     .innerJoin(scenario, eq(scenario.id, assignment.scenarioId))
     .innerJoin(subject, eq(subject.id, scenario.subjectId))
+    .innerJoin(course, eq(course.id, assignment.courseId))
     .where(eq(assignment.id, assignmentId))
     .limit(1);
   if (!row) throw notFound();
